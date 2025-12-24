@@ -1,0 +1,1319 @@
+// Data storage
+let teamMembers = []; // Format: [{ name: "John", color: "#ce2828", profilePicture: "data:image/..." }, ...]
+let clients = []; // Format: [{ name: "Client A", color: "#667eea" }, ...]
+let schedule = {}; // Format: { "2024-01-15-Monday-Work1": [{ member: "John", client: "Client A" }, ...] }
+let currentWeekStart = new Date();
+let isDarkTheme = true; // Default to dark theme
+let timeBlocks = []; // Format: [{ id: 'Work1', label: 'Work Block 1', time: '11:00 AM - 1:00 PM', startTime: '11:00', endTime: '13:00', isLunch: false }, ...]
+
+// Undo/Redo system
+let undoHistory = [];
+let maxHistorySize = 50;
+
+// Initialize app
+document.addEventListener('DOMContentLoaded', () => {
+    loadData();
+    initializeCalendar();
+    setupEventListeners();
+    renderSidebar();
+    renderSettings();
+    updateStats();
+});
+
+// Load data from localStorage
+function loadData() {
+    const savedMembers = localStorage.getItem('teamMembers');
+    const savedClients = localStorage.getItem('clients');
+    const savedSchedule = localStorage.getItem('schedule');
+    const savedWeek = localStorage.getItem('currentWeekStart');
+    const savedTheme = localStorage.getItem('isDarkTheme');
+
+        if (savedMembers) {
+        teamMembers = JSON.parse(savedMembers);
+        // Migrate old string format to object format
+        if (teamMembers.length > 0 && typeof teamMembers[0] === 'string') {
+            const defaultColors = ['#ce2828', '#4a90e2', '#50c878', '#ff6b6b', '#9b59b6', '#f39c12'];
+            teamMembers = teamMembers.map((name, i) => ({
+                name: name,
+                color: defaultColors[i % defaultColors.length],
+                profilePicture: ''
+            }));
+        }
+        // Ensure all members have profilePicture property
+        teamMembers = teamMembers.map(member => ({
+            ...member,
+            profilePicture: member.profilePicture || ''
+        }));
+    } else {
+        // Default data
+        teamMembers = [
+            { name: 'John Doe', color: '#ce2828', profilePicture: '' },
+            { name: 'Jane Smith', color: '#4a90e2', profilePicture: '' },
+            { name: 'Bob Johnson', color: '#50c878', profilePicture: '' }
+        ];
+    }
+
+    if (savedClients) {
+        clients = JSON.parse(savedClients);
+        // Migrate old string format to object format
+        if (clients.length > 0 && typeof clients[0] === 'string') {
+            const defaultColors = ['#667eea', '#764ba2', '#f093fb', '#4facfe', '#43e97b', '#fa709a'];
+            clients = clients.map((name, i) => ({
+                name: name,
+                color: defaultColors[i % defaultColors.length]
+            }));
+        }
+    } else {
+        // Default data
+        clients = [
+            { name: 'Client A', color: '#667eea' },
+            { name: 'Client B', color: '#764ba2' },
+            { name: 'Client C', color: '#f093fb' }
+        ];
+    }
+
+    if (savedSchedule) {
+        schedule = JSON.parse(savedSchedule);
+        // Migrate old single assignment format to array format
+        Object.keys(schedule).forEach(key => {
+            if (schedule[key] && !Array.isArray(schedule[key])) {
+                schedule[key] = [schedule[key]];
+            }
+        });
+    }
+
+    if (savedWeek) {
+        currentWeekStart = new Date(savedWeek);
+    } else {
+        // Set to start of current week (Monday)
+        const today = new Date();
+        const day = today.getDay();
+        const diff = today.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is Sunday
+        currentWeekStart = new Date(today.setDate(diff));
+        currentWeekStart.setHours(0, 0, 0, 0);
+    }
+
+    if (savedTheme !== null) {
+        isDarkTheme = savedTheme === 'true';
+    }
+
+    const savedTimeBlocks = localStorage.getItem('timeBlocks');
+    if (savedTimeBlocks) {
+        timeBlocks = JSON.parse(savedTimeBlocks);
+    } else {
+        // Default time blocks
+        timeBlocks = [
+            { id: 'Work1', label: 'Work Block 1', time: '11:00 AM - 1:00 PM', startTime: '11:00', endTime: '13:00', isLunch: false },
+            { id: 'Lunch', label: 'Lunch', time: '1:00 PM - 2:00 PM', startTime: '13:00', endTime: '14:00', isLunch: true },
+            { id: 'Work2', label: 'Work Block 2', time: '2:00 PM - 4:00 PM', startTime: '14:00', endTime: '16:00', isLunch: false },
+            { id: 'Work3', label: 'Work Block 3', time: '4:00 PM - 6:00 PM', startTime: '16:00', endTime: '18:00', isLunch: false }
+        ];
+    }
+    
+    applyTheme();
+}
+
+// Save state to history for undo
+function saveStateToHistory() {
+    const state = {
+        teamMembers: JSON.parse(JSON.stringify(teamMembers)),
+        clients: JSON.parse(JSON.stringify(clients)),
+        schedule: JSON.parse(JSON.stringify(schedule)),
+        timeBlocks: JSON.parse(JSON.stringify(timeBlocks))
+    };
+    
+    undoHistory.push(state);
+    
+    // Limit history size
+    if (undoHistory.length > maxHistorySize) {
+        undoHistory.shift();
+    }
+}
+
+// Undo last action
+function undo() {
+    if (undoHistory.length > 0) {
+        const previousState = undoHistory.pop();
+        teamMembers = previousState.teamMembers;
+        clients = previousState.clients;
+        schedule = previousState.schedule;
+        if (previousState.timeBlocks) {
+            timeBlocks = previousState.timeBlocks;
+        }
+        
+        saveData();
+        renderSidebar();
+        renderSettings();
+        renderCalendar();
+        updateStats();
+    }
+}
+
+// Save data to localStorage
+function saveData() {
+    localStorage.setItem('teamMembers', JSON.stringify(teamMembers));
+    localStorage.setItem('clients', JSON.stringify(clients));
+    localStorage.setItem('schedule', JSON.stringify(schedule));
+    localStorage.setItem('currentWeekStart', currentWeekStart.toISOString());
+    localStorage.setItem('isDarkTheme', isDarkTheme);
+    localStorage.setItem('timeBlocks', JSON.stringify(timeBlocks));
+}
+
+// Initialize calendar
+function initializeCalendar() {
+    renderCalendar();
+    updateWeekDisplay();
+}
+
+// Render time column
+function renderTimeColumn() {
+    const timeColumn = document.querySelector('.time-column');
+    if (!timeColumn) return;
+    
+    timeColumn.innerHTML = '';
+    
+    timeBlocks.forEach((block, index) => {
+        const timeSlot = document.createElement('div');
+        timeSlot.className = `time-slot ${block.isLunch ? 'lunch-slot' : ''}`;
+        timeSlot.dataset.blockId = block.id;
+        timeSlot.dataset.blockIndex = index;
+        
+        if (block.isLunch) {
+            timeSlot.style.height = '70px';
+        } else {
+            timeSlot.style.height = '220px';
+        }
+        
+        const timeDisplay = document.createElement('div');
+        timeDisplay.className = 'time-display';
+        timeDisplay.textContent = block.time;
+        timeSlot.appendChild(timeDisplay);
+        
+        // Add edit and delete buttons on hover (not for lunch)
+        if (!block.isLunch) {
+            const buttonContainer = document.createElement('div');
+            buttonContainer.className = 'time-slot-buttons';
+            
+            const editBtn = document.createElement('button');
+            editBtn.className = 'time-edit-btn';
+            editBtn.innerHTML = '✎';
+            editBtn.title = 'Edit time';
+            editBtn.onclick = (e) => {
+                e.stopPropagation();
+                editTimeBlock(index);
+            };
+            buttonContainer.appendChild(editBtn);
+            
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'time-delete-btn';
+            deleteBtn.innerHTML = '×';
+            deleteBtn.title = 'Delete time block';
+            deleteBtn.onclick = (e) => {
+                e.stopPropagation();
+                deleteTimeBlock(index);
+            };
+            buttonContainer.appendChild(deleteBtn);
+            
+            timeSlot.appendChild(buttonContainer);
+        }
+        
+        timeColumn.appendChild(timeSlot);
+    });
+    
+    // Add "Add Block" button at the end
+    const addBlockBtn = document.createElement('div');
+    addBlockBtn.className = 'time-slot add-block-slot';
+    addBlockBtn.innerHTML = '<button class="add-block-btn" onclick="showAddBlockModal()">+ Add Block</button>';
+    timeColumn.appendChild(addBlockBtn);
+}
+
+// Render calendar
+function renderCalendar() {
+    const calendarGrid = document.getElementById('calendarGrid');
+    calendarGrid.innerHTML = '';
+
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+    
+    // Render time column
+    renderTimeColumn();
+
+    days.forEach((day, dayIndex) => {
+        const dayColumn = document.createElement('div');
+        dayColumn.className = 'day-column';
+
+        const dayDate = new Date(currentWeekStart);
+        dayDate.setDate(currentWeekStart.getDate() + dayIndex);
+        const dateKey = formatDateKey(dayDate, day);
+
+        timeBlocks.forEach((block, blockIndex) => {
+            const timeBlock = document.createElement('div');
+            timeBlock.className = `time-block ${block.id === 'Lunch' ? 'lunch' : 'work-block'}`;
+            
+            if (block.id === 'Lunch') {
+                timeBlock.textContent = 'Lunch (Unavailable)';
+            } else {
+                const blockKey = `${dateKey}-${block.id}`;
+                const assignments = schedule[blockKey] || [];
+
+                // Create assignments container
+                const assignmentsContainer = document.createElement('div');
+                assignmentsContainer.className = 'assignments-container';
+
+                assignments.forEach((assignment, assignmentIndex) => {
+                    const member = teamMembers.find(m => m.name === assignment.member);
+                    const client = clients.find(c => c.name === assignment.client);
+                    const memberColor = member ? member.color : '#ce2828';
+                    const clientColor = client ? client.color : '#667eea';
+                    const profilePicture = member && member.profilePicture ? member.profilePicture : '';
+
+                    const assignmentDiv = document.createElement('div');
+                    assignmentDiv.className = 'assignment';
+                    assignmentDiv.draggable = true;
+                    assignmentDiv.dataset.sourceBlock = blockKey;
+                    assignmentDiv.dataset.assignmentIndex = assignmentIndex;
+                    assignmentDiv.innerHTML = `
+                        <div class="assignment-container" style="border-radius: 50px;">
+                            <div class="assignment-member-section" style="background-color: ${memberColor}">
+                                <div class="assignment-member-circle">
+                                    ${profilePicture ? 
+                                        `<img src="${profilePicture}" alt="${assignment.member}" class="assignment-profile-picture">` : 
+                                        `<span class="assignment-member-initial">${assignment.member.charAt(0).toUpperCase()}</span>`
+                                    }
+                                </div>
+                                <div class="assignment-member-box">
+                                    <span class="assignment-member-name">${assignment.member}</span>
+                                </div>
+                            </div>
+                            <div class="assignment-client-box" style="background-color: ${clientColor}">
+                                <span class="assignment-client-name">${assignment.client}</span>
+                                <button class="assignment-remove" onclick="removeAssignment('${blockKey}', ${assignmentIndex})">×</button>
+                            </div>
+                        </div>
+                    `;
+                    
+                    // Add drag event listeners
+                    assignmentDiv.addEventListener('dragstart', (e) => {
+                        e.dataTransfer.setData('text/plain', JSON.stringify({
+                            sourceBlock: blockKey,
+                            assignmentIndex: assignmentIndex,
+                            assignment: assignment
+                        }));
+                        assignmentDiv.classList.add('dragging-assignment');
+                        window.draggingAssignment = true;
+                    });
+                    
+                    assignmentDiv.addEventListener('dragend', () => {
+                        assignmentDiv.classList.remove('dragging-assignment');
+                        window.draggingAssignment = false;
+                    });
+                    
+                    assignmentsContainer.appendChild(assignmentDiv);
+                });
+
+                timeBlock.appendChild(assignmentsContainer);
+
+                // Add clear buttons
+                const clearBtnContainer = document.createElement('div');
+                clearBtnContainer.className = 'block-clear-buttons';
+                
+                // Clear this block button
+                if (assignments.length > 0) {
+                    const clearBtn = document.createElement('button');
+                    clearBtn.className = 'block-clear-btn';
+                    clearBtn.innerHTML = 'Clear Block';
+                    clearBtn.title = 'Clear all assignments in this block';
+                    clearBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        saveStateToHistory();
+                        delete schedule[blockKey];
+                        saveData();
+                        renderCalendar();
+                        updateStats();
+                    };
+                    clearBtnContainer.appendChild(clearBtn);
+                }
+                
+                // Check if there are assignments in horizontal line (all days for this time block)
+                const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+                let hasHorizontalAssignments = false;
+                days.forEach((dayName, dayIdx) => {
+                    const dayDate = new Date(currentWeekStart);
+                    dayDate.setDate(currentWeekStart.getDate() + dayIdx);
+                    const dayDateKey = formatDateKey(dayDate, dayName);
+                    const dayBlockKey = `${dayDateKey}-${block.id}`;
+                    if (schedule[dayBlockKey] && schedule[dayBlockKey].length > 0) {
+                        hasHorizontalAssignments = true;
+                    }
+                });
+                
+                // Clear horizontal line (all days for this time block)
+                if (hasHorizontalAssignments) {
+                    const clearHorizontalBtn = document.createElement('button');
+                    clearHorizontalBtn.className = 'block-clear-btn clear-horizontal-btn';
+                    clearHorizontalBtn.innerHTML = 'Clear Time';
+                    clearHorizontalBtn.title = 'Clear all assignments for this time block across all days';
+                    clearHorizontalBtn.dataset.blockId = block.id;
+                    clearHorizontalBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        saveStateToHistory();
+                        days.forEach((dayName, dayIdx) => {
+                            const dayDate = new Date(currentWeekStart);
+                            dayDate.setDate(currentWeekStart.getDate() + dayIdx);
+                            const dayDateKey = formatDateKey(dayDate, dayName);
+                            const dayBlockKey = `${dayDateKey}-${block.id}`;
+                            delete schedule[dayBlockKey];
+                        });
+                        saveData();
+                        renderCalendar();
+                        updateStats();
+                    };
+                    
+                    // Add hover effects for highlighting
+                    clearHorizontalBtn.addEventListener('mouseenter', () => {
+                        highlightHorizontalBlocks(block.id);
+                    });
+                    clearHorizontalBtn.addEventListener('mouseleave', () => {
+                        clearHighlights();
+                    });
+                    
+                    clearBtnContainer.appendChild(clearHorizontalBtn);
+                }
+                
+                // Check if there are assignments in vertical line (all time blocks for this day)
+                const workBlocks = ['Work1', 'Work2', 'Work3'];
+                let hasVerticalAssignments = false;
+                workBlocks.forEach(workBlockId => {
+                    const dayBlockKey = `${dateKey}-${workBlockId}`;
+                    if (schedule[dayBlockKey] && schedule[dayBlockKey].length > 0) {
+                        hasVerticalAssignments = true;
+                    }
+                });
+                
+                // Clear vertical line (all time blocks for this day)
+                if (hasVerticalAssignments) {
+                    const clearVerticalBtn = document.createElement('button');
+                    clearVerticalBtn.className = 'block-clear-btn clear-vertical-btn';
+                    clearVerticalBtn.innerHTML = 'Clear Day';
+                    clearVerticalBtn.title = 'Clear all assignments for this day';
+                    clearVerticalBtn.dataset.dateKey = dateKey;
+                    clearVerticalBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        saveStateToHistory();
+                        workBlocks.forEach(workBlockId => {
+                            const dayBlockKey = `${dateKey}-${workBlockId}`;
+                            delete schedule[dayBlockKey];
+                        });
+                        saveData();
+                        renderCalendar();
+                        updateStats();
+                    };
+                    
+                    // Add hover effects for highlighting
+                    clearVerticalBtn.addEventListener('mouseenter', () => {
+                        highlightVerticalBlocks(dateKey);
+                    });
+                    clearVerticalBtn.addEventListener('mouseleave', () => {
+                        clearHighlights();
+                    });
+                    
+                    clearBtnContainer.appendChild(clearVerticalBtn);
+                }
+                
+                timeBlock.appendChild(clearBtnContainer);
+
+                // Make droppable
+                timeBlock.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    timeBlock.classList.add('drag-over');
+                });
+
+                timeBlock.addEventListener('dragleave', () => {
+                    timeBlock.classList.remove('drag-over');
+                });
+
+                timeBlock.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    timeBlock.classList.remove('drag-over');
+                    
+                    // Check if dropping an assignment (task) or a team member
+                    if (window.draggingAssignment) {
+                        handleAssignmentDrop(e, blockKey);
+                    } else {
+                        handleDrop(e, blockKey);
+                    }
+                });
+            }
+
+            dayColumn.appendChild(timeBlock);
+        });
+
+        calendarGrid.appendChild(dayColumn);
+    });
+
+    // Add duplicate buttons between day columns
+    addDuplicateButtons();
+}
+
+// Add duplicate buttons between day columns
+function addDuplicateButtons() {
+    const calendarGrid = document.getElementById('calendarGrid');
+    const dayColumns = calendarGrid.querySelectorAll('.day-column');
+    
+    dayColumns.forEach((dayColumn, dayIndex) => {
+        if (dayIndex < dayColumns.length - 1) {
+            // Add duplicate button to each work block in this day column
+            const workBlocks = dayColumn.querySelectorAll('.work-block');
+            workBlocks.forEach((workBlock, blockIndex) => {
+                const duplicateBtn = document.createElement('button');
+                duplicateBtn.className = 'duplicate-btn';
+                duplicateBtn.innerHTML = '📋';
+                duplicateBtn.title = 'Duplicate this block across the week';
+                duplicateBtn.style.position = 'absolute';
+                duplicateBtn.style.right = '-16px';
+                duplicateBtn.style.top = '50%';
+                duplicateBtn.style.transform = 'translateY(-50%)';
+                duplicateBtn.style.zIndex = '15';
+                
+                duplicateBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+                    const timeBlocks = ['Work1', 'Work2', 'Work3'];
+                    const blockId = timeBlocks[blockIndex];
+                    
+                    const sourceDate = new Date(currentWeekStart);
+                    sourceDate.setDate(currentWeekStart.getDate() + dayIndex);
+                    const sourceDateKey = formatDateKey(sourceDate, days[dayIndex]);
+                    const sourceBlockKey = `${sourceDateKey}-${blockId}`;
+                    const sourceAssignments = schedule[sourceBlockKey] || [];
+                    
+                    if (sourceAssignments.length > 0) {
+                        saveStateToHistory();
+                        days.forEach((day, targetDayIndex) => {
+                            if (targetDayIndex !== dayIndex) {
+                                const targetDate = new Date(currentWeekStart);
+                                targetDate.setDate(currentWeekStart.getDate() + targetDayIndex);
+                                const targetDateKey = formatDateKey(targetDate, day);
+                                const targetBlockKey = `${targetDateKey}-${blockId}`;
+                                
+                                if (!schedule[targetBlockKey] || schedule[targetBlockKey].length === 0) {
+                                    schedule[targetBlockKey] = JSON.parse(JSON.stringify(sourceAssignments));
+                                }
+                            }
+                        });
+                        saveData();
+                        renderCalendar();
+                        updateStats();
+                    } else {
+                        alert('No assignments to duplicate in this block.');
+                    }
+                });
+                
+                workBlock.style.position = 'relative';
+                workBlock.appendChild(duplicateBtn);
+            });
+        }
+    });
+}
+
+
+// Format date key for storage
+function formatDateKey(date, day) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const dayNum = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${dayNum}-${day}`;
+}
+
+// Handle drop event for team members
+function handleDrop(e, blockKey) {
+    const data = e.dataTransfer.getData('text/plain');
+    const [type, value] = data.split(':');
+
+    if (type === 'member') {
+        // Show client selection modal
+        showClientModal(value, blockKey);
+    }
+}
+
+// Handle drop event for assignments (tasks)
+function handleAssignmentDrop(e, blockKey) {
+    try {
+        const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+        const sourceBlock = data.sourceBlock;
+        const assignmentIndex = data.assignmentIndex;
+        const assignment = data.assignment;
+        const isDuplicating = e.shiftKey;
+        
+        // Don't allow dropping on the same block
+        if (sourceBlock === blockKey) {
+            return;
+        }
+        
+        // Check if member is already in target block
+        const targetAssignments = schedule[blockKey] || [];
+        const memberAlreadyAssigned = targetAssignments.some(
+            a => a.member === assignment.member
+        );
+        
+        if (memberAlreadyAssigned) {
+            alert(`${assignment.member} is already assigned to this time block.`);
+            return;
+        }
+        
+        saveStateToHistory();
+        
+        // Add to target block
+        if (!schedule[blockKey]) {
+            schedule[blockKey] = [];
+        }
+        schedule[blockKey].push({
+            member: assignment.member,
+            client: assignment.client
+        });
+        
+        // Remove from source block if not duplicating
+        if (!isDuplicating) {
+            if (schedule[sourceBlock] && Array.isArray(schedule[sourceBlock])) {
+                schedule[sourceBlock].splice(assignmentIndex, 1);
+                if (schedule[sourceBlock].length === 0) {
+                    delete schedule[sourceBlock];
+                }
+            }
+        }
+        
+        saveData();
+        renderCalendar();
+        updateStats();
+    } catch (err) {
+        console.error('Error handling assignment drop:', err);
+    }
+}
+
+// Show client selection modal
+function showClientModal(memberName, blockKey) {
+    const modal = document.getElementById('clientModal');
+    const clientList = document.getElementById('clientSelectionList');
+    
+    clientList.innerHTML = '';
+    
+    if (clients.length === 0) {
+        clientList.innerHTML = '<p style="text-align: center; color: #999; padding: 2rem;">No clients available. Add clients in Settings.</p>';
+    } else {
+        clients.forEach(client => {
+            const option = document.createElement('div');
+            option.className = 'client-option';
+            option.style.borderColor = client.color;
+            option.innerHTML = `
+                <div class="client-option-color" style="background-color: ${client.color}"></div>
+                <span>${client.name}</span>
+            `;
+            option.onclick = () => {
+                assignMemberToBlock(memberName, client.name, blockKey);
+                closeClientModal();
+            };
+            clientList.appendChild(option);
+        });
+    }
+    
+    modal.classList.add('show');
+    window.currentBlockKey = blockKey;
+    window.currentMemberName = memberName;
+}
+
+// Close client modal
+function closeClientModal() {
+    const modal = document.getElementById('clientModal');
+    modal.classList.remove('show');
+}
+
+// Assign member to block
+function assignMemberToBlock(memberName, clientName, blockKey) {
+    if (!schedule[blockKey]) {
+        schedule[blockKey] = [];
+    }
+    
+    // Check if member is already in this block
+    const memberAlreadyAssigned = schedule[blockKey].some(
+        assignment => assignment.member === memberName
+    );
+    
+    if (memberAlreadyAssigned) {
+        alert(`${memberName} is already assigned to this time block.`);
+        return;
+    }
+    
+    saveStateToHistory();
+    schedule[blockKey].push({
+        member: memberName,
+        client: clientName
+    });
+    saveData();
+    renderCalendar();
+    updateStats();
+}
+
+// Remove assignment
+function removeAssignment(blockKey, assignmentIndex) {
+    saveStateToHistory();
+    if (schedule[blockKey] && Array.isArray(schedule[blockKey])) {
+        schedule[blockKey].splice(assignmentIndex, 1);
+        if (schedule[blockKey].length === 0) {
+            delete schedule[blockKey];
+        }
+    } else {
+        delete schedule[blockKey];
+    }
+    saveData();
+    renderCalendar();
+    updateStats();
+}
+
+// Render sidebar
+function renderSidebar() {
+    const membersList = document.getElementById('teamMembersList');
+    const clientsList = document.getElementById('clientsList');
+
+    membersList.innerHTML = '';
+    teamMembers.forEach(member => {
+        const item = document.createElement('div');
+        item.className = 'draggable-item';
+        item.draggable = true;
+        const profileDisplay = member.profilePicture ? 
+            `<img src="${member.profilePicture}" alt="${member.name}" class="sidebar-profile-picture">` : 
+            `<div class="sidebar-profile-initial">${member.name.charAt(0).toUpperCase()}</div>`;
+        item.innerHTML = `
+            <div class="draggable-item-profile circular" style="background-color: ${member.color}">
+                ${profileDisplay}
+            </div>
+            <span>${member.name}</span>
+        `;
+        item.dataset.type = 'member';
+        item.dataset.value = member.name;
+        
+        item.addEventListener('dragstart', (e) => {
+            e.dataTransfer.setData('text/plain', `member:${member.name}`);
+            item.classList.add('dragging');
+        });
+
+        item.addEventListener('dragend', () => {
+            item.classList.remove('dragging');
+        });
+
+        membersList.appendChild(item);
+    });
+
+    clientsList.innerHTML = '';
+    clients.forEach(client => {
+        const item = document.createElement('div');
+        item.className = 'draggable-item';
+        item.innerHTML = `
+            <div class="draggable-item-color circular" style="background-color: ${client.color}"></div>
+            <span>${client.name}</span>
+        `;
+        clientsList.appendChild(item);
+    });
+}
+
+// Render settings
+function renderSettings() {
+    const membersList = document.getElementById('membersSettingsList');
+    const clientsList = document.getElementById('clientsSettingsList');
+
+    membersList.innerHTML = '';
+    teamMembers.forEach((member, index) => {
+        const item = document.createElement('div');
+        item.className = 'settings-item';
+        item.innerHTML = `
+            <div class="settings-item-profile-section">
+                <div class="profile-picture-container">
+                    <label for="memberProfile${index}" class="profile-picture-label">
+                        ${member.profilePicture ? 
+                            `<img src="${member.profilePicture}" alt="${member.name}" class="profile-picture-preview">` : 
+                            `<div class="profile-picture-placeholder">+</div>`
+                        }
+                    </label>
+                    <input type="file" id="memberProfile${index}" accept="image/*" 
+                           onchange="updateMemberProfile(${index}, this)" class="profile-picture-input" style="display: none;">
+                </div>
+                <div class="settings-item-color-picker">
+                    <input type="color" id="memberColor${index}" value="${member.color}" 
+                           onchange="updateMemberColor(${index}, this.value)" class="color-picker">
+                    <label for="memberColor${index}" class="color-picker-label"></label>
+                </div>
+            </div>
+            <span class="settings-item-name">${member.name}</span>
+            <div class="settings-item-actions">
+                <button class="btn-edit" onclick="editMember(${index})">Edit</button>
+                <button class="btn-delete" onclick="deleteMember(${index})">Delete</button>
+            </div>
+        `;
+        membersList.appendChild(item);
+    });
+
+    clientsList.innerHTML = '';
+    clients.forEach((client, index) => {
+        const item = document.createElement('div');
+        item.className = 'settings-item';
+        item.innerHTML = `
+            <div class="settings-item-color-picker">
+                <input type="color" id="clientColor${index}" value="${client.color}" 
+                       onchange="updateClientColor(${index}, this.value)" class="color-picker">
+                <label for="clientColor${index}" class="color-picker-label"></label>
+            </div>
+            <span class="settings-item-name">${client.name}</span>
+            <div class="settings-item-actions">
+                <button class="btn-edit" onclick="editClient(${index})">Edit</button>
+                <button class="btn-delete" onclick="deleteClient(${index})">Delete</button>
+            </div>
+        `;
+        clientsList.appendChild(item);
+    });
+}
+
+// Setup event listeners
+function setupEventListeners() {
+    // Settings modal
+    document.getElementById('settingsBtn').addEventListener('click', () => {
+        document.getElementById('settingsModal').classList.add('show');
+        renderSettings();
+    });
+
+    document.getElementById('closeSettings').addEventListener('click', () => {
+        document.getElementById('settingsModal').classList.remove('show');
+    });
+
+    // Client modal
+    document.getElementById('closeClientModal').addEventListener('click', closeClientModal);
+
+    // Close modals on outside click
+    window.addEventListener('click', (e) => {
+        const settingsModal = document.getElementById('settingsModal');
+        const clientModal = document.getElementById('clientModal');
+        if (e.target === settingsModal) {
+            settingsModal.classList.remove('show');
+        }
+        if (e.target === clientModal) {
+            closeClientModal();
+        }
+    });
+
+    // Add member
+    document.getElementById('addMemberBtn').addEventListener('click', () => {
+        const input = document.getElementById('newMemberName');
+        const name = input.value.trim();
+        if (name && !teamMembers.find(m => m.name === name)) {
+            saveStateToHistory();
+            const defaultColors = ['#ce2828', '#4a90e2', '#50c878', '#ff6b6b', '#9b59b6', '#f39c12'];
+            teamMembers.push({
+                name: name,
+                color: defaultColors[teamMembers.length % defaultColors.length],
+                profilePicture: ''
+            });
+            saveData();
+            renderSidebar();
+            renderSettings();
+            input.value = '';
+        } else if (teamMembers.find(m => m.name === name)) {
+            alert('Member already exists!');
+        }
+    });
+
+    // Add client
+    document.getElementById('addClientBtn').addEventListener('click', () => {
+        const input = document.getElementById('newClientName');
+        const name = input.value.trim();
+        if (name && !clients.find(c => c.name === name)) {
+            saveStateToHistory();
+            const defaultColors = ['#667eea', '#764ba2', '#f093fb', '#4facfe', '#43e97b', '#fa709a'];
+            clients.push({
+                name: name,
+                color: defaultColors[clients.length % defaultColors.length]
+            });
+            saveData();
+            renderSidebar();
+            renderSettings();
+            input.value = '';
+        } else if (clients.find(c => c.name === name)) {
+            alert('Client already exists!');
+        }
+    });
+
+    // Keyboard shortcut for undo (Ctrl+Z)
+    document.addEventListener('keydown', (e) => {
+        if (e.ctrlKey && e.key === 'z' && !e.shiftKey) {
+            e.preventDefault();
+            undo();
+        }
+    });
+
+    // Theme toggle
+    document.getElementById('themeToggle').addEventListener('click', () => {
+        isDarkTheme = !isDarkTheme;
+        applyTheme();
+        saveData();
+    });
+
+    // Week navigation
+    document.getElementById('prevWeek').addEventListener('click', () => {
+        currentWeekStart.setDate(currentWeekStart.getDate() - 7);
+        saveData();
+        renderCalendar();
+        updateWeekDisplay();
+    });
+
+    document.getElementById('nextWeek').addEventListener('click', () => {
+        currentWeekStart.setDate(currentWeekStart.getDate() + 7);
+        saveData();
+        renderCalendar();
+        updateWeekDisplay();
+    });
+
+    // Enter key support for inputs
+    document.getElementById('newMemberName').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            document.getElementById('addMemberBtn').click();
+        }
+    });
+
+    document.getElementById('newClientName').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            document.getElementById('addClientBtn').click();
+        }
+    });
+}
+
+// Update week display
+function updateWeekDisplay() {
+    const weekEnd = new Date(currentWeekStart);
+    weekEnd.setDate(currentWeekStart.getDate() + 4); // Monday to Friday (5 days)
+    
+    const options = { month: 'short', day: 'numeric', year: 'numeric' };
+    const startStr = currentWeekStart.toLocaleDateString('en-US', options);
+    const endStr = weekEnd.toLocaleDateString('en-US', options);
+    
+    document.getElementById('weekDisplay').textContent = `${startStr} - ${endStr} (EST)`;
+}
+
+// Update member color
+function updateMemberColor(index, color) {
+    teamMembers[index].color = color;
+    saveData();
+    renderSidebar();
+    renderCalendar();
+    updateStats();
+}
+
+// Update member profile picture
+function updateMemberProfile(index, input) {
+    const file = input.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            teamMembers[index].profilePicture = e.target.result;
+            saveData();
+            renderSidebar();
+            renderSettings();
+            renderCalendar();
+        };
+        reader.readAsDataURL(file);
+    }
+}
+
+// Update client color
+function updateClientColor(index, color) {
+    clients[index].color = color;
+    saveData();
+    renderSidebar();
+    renderCalendar();
+    updateStats();
+}
+
+// Edit member
+function editMember(index) {
+    const newName = prompt('Enter new name:', teamMembers[index].name);
+    if (newName && newName.trim() && !teamMembers.find(m => m.name === newName.trim())) {
+        saveStateToHistory();
+        const oldName = teamMembers[index].name;
+        teamMembers[index].name = newName.trim();
+        
+        // Update all schedule entries with this member
+        Object.keys(schedule).forEach(key => {
+            if (Array.isArray(schedule[key])) {
+                schedule[key].forEach(assignment => {
+                    if (assignment.member === oldName) {
+                        assignment.member = newName.trim();
+                    }
+                });
+            }
+        });
+        
+        saveData();
+        renderSidebar();
+        renderSettings();
+        renderCalendar();
+        updateStats();
+    } else if (teamMembers.find(m => m.name === newName.trim())) {
+        alert('Member with this name already exists!');
+    }
+}
+
+// Delete member
+function deleteMember(index) {
+    saveStateToHistory();
+    const memberName = teamMembers[index].name;
+    teamMembers.splice(index, 1);
+    
+    // Remove all schedule entries with this member
+    Object.keys(schedule).forEach(key => {
+        if (Array.isArray(schedule[key])) {
+            schedule[key] = schedule[key].filter(assignment => assignment.member !== memberName);
+            if (schedule[key].length === 0) {
+                delete schedule[key];
+            }
+        }
+    });
+    
+    saveData();
+    renderSidebar();
+    renderSettings();
+    renderCalendar();
+    updateStats();
+}
+
+// Edit client
+function editClient(index) {
+    const newName = prompt('Enter new name:', clients[index].name);
+    if (newName && newName.trim() && !clients.find(c => c.name === newName.trim())) {
+        saveStateToHistory();
+        const oldName = clients[index].name;
+        clients[index].name = newName.trim();
+        
+        // Update all schedule entries with this client
+        Object.keys(schedule).forEach(key => {
+            if (Array.isArray(schedule[key])) {
+                schedule[key].forEach(assignment => {
+                    if (assignment.client === oldName) {
+                        assignment.client = newName.trim();
+                    }
+                });
+            }
+        });
+        
+        saveData();
+        renderSidebar();
+        renderSettings();
+        renderCalendar();
+        updateStats();
+    } else if (clients.find(c => c.name === newName.trim())) {
+        alert('Client with this name already exists!');
+    }
+}
+
+// Delete client
+function deleteClient(index) {
+    saveStateToHistory();
+    const clientName = clients[index].name;
+    clients.splice(index, 1);
+    
+    // Remove all schedule entries with this client
+    Object.keys(schedule).forEach(key => {
+        if (Array.isArray(schedule[key])) {
+            schedule[key] = schedule[key].filter(assignment => assignment.client !== clientName);
+            if (schedule[key].length === 0) {
+                delete schedule[key];
+            }
+        }
+    });
+    
+    saveData();
+    renderSidebar();
+    renderSettings();
+    renderCalendar();
+    updateStats();
+}
+
+// Apply theme
+function applyTheme() {
+    document.body.classList.toggle('dark-theme', isDarkTheme);
+    document.body.classList.toggle('bright-theme', !isDarkTheme);
+}
+
+// Highlight horizontal blocks (all days for a time block)
+function highlightHorizontalBlocks(blockId) {
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+    days.forEach((dayName, dayIdx) => {
+        const dayDate = new Date(currentWeekStart);
+        dayDate.setDate(currentWeekStart.getDate() + dayIdx);
+        const dayDateKey = formatDateKey(dayDate, dayName);
+        const dayBlockKey = `${dayDateKey}-${blockId}`;
+        
+        // Find the time block element
+        const calendarGrid = document.getElementById('calendarGrid');
+        const dayColumns = calendarGrid.querySelectorAll('.day-column');
+        if (dayColumns[dayIdx]) {
+            const timeBlocks = dayColumns[dayIdx].querySelectorAll('.work-block');
+            const timeBlockIndex = ['Work1', 'Work2', 'Work3'].indexOf(blockId);
+            if (timeBlocks[timeBlockIndex]) {
+                timeBlocks[timeBlockIndex].classList.add('highlight-clear');
+            }
+        }
+    });
+}
+
+// Highlight vertical blocks (all time blocks for a day)
+function highlightVerticalBlocks(dateKey) {
+    const calendarGrid = document.getElementById('calendarGrid');
+    const dayColumns = calendarGrid.querySelectorAll('.day-column');
+    
+    dayColumns.forEach((dayColumn, dayIdx) => {
+        const dayDate = new Date(currentWeekStart);
+        dayDate.setDate(currentWeekStart.getDate() + dayIdx);
+        const dayName = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'][dayIdx];
+        const dayDateKey = formatDateKey(dayDate, dayName);
+        
+        if (dayDateKey === dateKey) {
+            const timeBlocks = dayColumn.querySelectorAll('.work-block');
+            timeBlocks.forEach(block => {
+                block.classList.add('highlight-clear');
+            });
+        }
+    });
+}
+
+// Clear all highlights
+function clearHighlights() {
+    const calendarGrid = document.getElementById('calendarGrid');
+    const highlightedBlocks = calendarGrid.querySelectorAll('.highlight-clear');
+    highlightedBlocks.forEach(block => {
+        block.classList.remove('highlight-clear');
+    });
+}
+
+// Show add block modal
+function showAddBlockModal() {
+    const startTime = prompt('Enter start time (e.g., 9:00 AM):');
+    if (!startTime) return;
+    
+    const endTime = prompt('Enter end time (e.g., 11:00 AM):');
+    if (!endTime) return;
+    
+    const label = prompt('Enter block label (e.g., Work Block 4):', 'Work Block');
+    if (!label) return;
+    
+    // Convert time to 24-hour format for storage
+    const start24 = convertTo24Hour(startTime);
+    const end24 = convertTo24Hour(endTime);
+    
+    if (!start24 || !end24) {
+        alert('Invalid time format. Please use format like "9:00 AM" or "14:00"');
+        return;
+    }
+    
+    saveStateToHistory();
+    
+    const newBlock = {
+        id: `Work${Date.now()}`,
+        label: label,
+        time: `${formatTimeDisplay(startTime)} - ${formatTimeDisplay(endTime)}`,
+        startTime: start24,
+        endTime: end24,
+        isLunch: false
+    };
+    
+    timeBlocks.push(newBlock);
+    saveData();
+    renderCalendar();
+}
+
+// Delete time block
+function deleteTimeBlock(blockIndex) {
+    const block = timeBlocks[blockIndex];
+    if (block.isLunch) {
+        alert('Lunch time cannot be deleted.');
+        return;
+    }
+    
+    if (timeBlocks.length <= 1) {
+        alert('You must have at least one time block.');
+        return;
+    }
+    
+    if (!confirm(`Delete "${block.label}" (${block.time})? All assignments in this time block will be removed.`)) {
+        return;
+    }
+    
+    saveStateToHistory();
+    
+    const blockId = block.id;
+    
+    // Remove all schedule entries for this time block
+    Object.keys(schedule).forEach(key => {
+        if (key.includes(`-${blockId}`)) {
+            delete schedule[key];
+        }
+    });
+    
+    // Remove the time block
+    timeBlocks.splice(blockIndex, 1);
+    
+    saveData();
+    renderCalendar();
+    updateStats();
+}
+
+// Edit time block
+function editTimeBlock(blockIndex) {
+    const block = timeBlocks[blockIndex];
+    if (block.isLunch) {
+        alert('Lunch time cannot be edited. You can delete and recreate it if needed.');
+        return;
+    }
+    
+    const newStartTime = prompt('Enter new start time (e.g., 9:00 AM):', convertFrom24Hour(block.startTime));
+    if (!newStartTime) return;
+    
+    const newEndTime = prompt('Enter new end time (e.g., 11:00 AM):', convertFrom24Hour(block.endTime));
+    if (!newEndTime) return;
+    
+    const newLabel = prompt('Enter new label:', block.label);
+    if (!newLabel) return;
+    
+    const start24 = convertTo24Hour(newStartTime);
+    const end24 = convertTo24Hour(newEndTime);
+    
+    if (!start24 || !end24) {
+        alert('Invalid time format. Please use format like "9:00 AM" or "14:00"');
+        return;
+    }
+    
+    saveStateToHistory();
+    
+    timeBlocks[blockIndex].time = `${formatTimeDisplay(newStartTime)} - ${formatTimeDisplay(newEndTime)}`;
+    timeBlocks[blockIndex].startTime = start24;
+    timeBlocks[blockIndex].endTime = end24;
+    timeBlocks[blockIndex].label = newLabel;
+    
+    saveData();
+    renderCalendar();
+}
+
+// Convert time to 24-hour format
+function convertTo24Hour(timeStr) {
+    timeStr = timeStr.trim().toUpperCase();
+    const isPM = timeStr.includes('PM');
+    const isAM = timeStr.includes('AM');
+    
+    // Remove AM/PM
+    timeStr = timeStr.replace(/[AP]M/gi, '').trim();
+    
+    const parts = timeStr.split(':');
+    if (parts.length !== 2) return null;
+    
+    let hours = parseInt(parts[0]);
+    const minutes = parseInt(parts[1]);
+    
+    if (isNaN(hours) || isNaN(minutes)) return null;
+    
+    if (isPM && hours !== 12) hours += 12;
+    if (isAM && hours === 12) hours = 0;
+    
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+}
+
+// Convert from 24-hour to 12-hour format
+function convertFrom24Hour(time24) {
+    const parts = time24.split(':');
+    const hours = parseInt(parts[0]);
+    const minutes = parts[1];
+    
+    const period = hours >= 12 ? 'PM' : 'AM';
+    const displayHours = hours > 12 ? hours - 12 : (hours === 0 ? 12 : hours);
+    
+    return `${displayHours}:${minutes} ${period}`;
+}
+
+// Format time for display
+function formatTimeDisplay(timeStr) {
+    // If already in 12-hour format, return as is
+    if (timeStr.includes('AM') || timeStr.includes('PM')) {
+        return timeStr;
+    }
+    // Otherwise convert from 24-hour
+    return convertFrom24Hour(timeStr);
+}
+
+// Calculate and update statistics
+function updateStats() {
+    const personHours = {};
+    const clientHours = {};
+    
+    // Each work block is 2 hours
+    const hoursPerBlock = 2;
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+    const workBlocks = ['Work1', 'Work2', 'Work3'];
+    
+    // Initialize counters
+    teamMembers.forEach(member => {
+        personHours[member.name] = 0;
+    });
+    
+    clients.forEach(client => {
+        clientHours[client.name] = 0;
+    });
+    
+    // Count hours from schedule
+    Object.keys(schedule).forEach(blockKey => {
+        const assignments = schedule[blockKey];
+        if (Array.isArray(assignments)) {
+            assignments.forEach(assignment => {
+                if (personHours.hasOwnProperty(assignment.member)) {
+                    personHours[assignment.member] += hoursPerBlock;
+                }
+                if (clientHours.hasOwnProperty(assignment.client)) {
+                    clientHours[assignment.client] += hoursPerBlock;
+                }
+            });
+        }
+    });
+    
+    // Render person stats
+    const personStatsDiv = document.getElementById('personStats');
+    personStatsDiv.innerHTML = '';
+    
+    const sortedPersons = Object.entries(personHours)
+        .sort((a, b) => b[1] - a[1]);
+    
+    sortedPersons.forEach(([name, hours]) => {
+        const statItem = document.createElement('div');
+        statItem.className = 'stat-item';
+        const member = teamMembers.find(m => m.name === name);
+        const color = member ? member.color : '#ce2828';
+        statItem.innerHTML = `
+            <div class="stat-color" style="background-color: ${color}"></div>
+            <span class="stat-name">${name}</span>
+            <span class="stat-value">${hours}h</span>
+        `;
+        personStatsDiv.appendChild(statItem);
+    });
+    
+    // Render client stats
+    const clientStatsDiv = document.getElementById('clientStats');
+    clientStatsDiv.innerHTML = '';
+    
+    const sortedClients = Object.entries(clientHours)
+        .sort((a, b) => b[1] - a[1]);
+    
+    sortedClients.forEach(([name, hours]) => {
+        const statItem = document.createElement('div');
+        statItem.className = 'stat-item';
+        const client = clients.find(c => c.name === name);
+        const color = client ? client.color : '#667eea';
+        statItem.innerHTML = `
+            <div class="stat-color" style="background-color: ${color}"></div>
+            <span class="stat-name">${name}</span>
+            <span class="stat-value">${hours}h</span>
+        `;
+        clientStatsDiv.appendChild(statItem);
+    });
+}
+

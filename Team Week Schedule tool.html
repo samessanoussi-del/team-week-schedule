@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Team Week Schedule</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <h1>Team Week Schedule</h1>
+            <div class="header-controls">
+                <button id="prevWeek" class="btn-nav">← Previous Week</button>
+                <span id="weekDisplay" class="week-display"></span>
+                <button id="nextWeek" class="btn-nav">Next Week →</button>
+                <button id="themeToggle" class="btn-theme-toggle" title="Toggle theme">🌓</button>
+                <button id="settingsBtn" class="btn-settings">⚙️ Settings</button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Sidebar Menu -->
+            <aside class="sidebar">
+                <div class="menu-section">
+                    <h2>Production Members</h2>
+                    <div id="teamMembersList" class="draggable-list">
+                        <!-- Team members will be populated here -->
+                    </div>
+                </div>
+                <div class="menu-section">
+                    <h2>Clients</h2>
+                    <div id="clientsList" class="draggable-list">
+                        <!-- Clients will be populated here -->
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Calendar -->
+            <main class="calendar-container">
+                <div class="calendar-header">
+                    <div class="time-header"></div>
+                    <div class="days-header">
+                        <div class="day-header">Monday</div>
+                        <div class="day-header">Tuesday</div>
+                        <div class="day-header">Wednesday</div>
+                        <div class="day-header">Thursday</div>
+                        <div class="day-header">Friday</div>
+                    </div>
+                </div>
+                <div class="calendar-body">
+                    <div class="time-column">
+                        <div class="time-slot">11:00 AM - 1:00 PM</div>
+                        <div class="time-slot lunch-slot">1:00 PM - 2:00 PM</div>
+                        <div class="time-slot">2:00 PM - 4:00 PM</div>
+                        <div class="time-slot">4:00 PM - 6:00 PM</div>
+                    </div>
+                    <div class="calendar-grid" id="calendarGrid">
+                        <!-- Calendar cells will be populated here -->
+                    </div>
+                </div>
+            </main>
+        </div>
+        
+        <!-- Stats Panel -->
+        <div class="stats-panel">
+            <h3>Statistics</h3>
+            <div class="stats-content">
+                <div class="stats-section">
+                    <h4>Hours per Person</h4>
+                    <div id="personStats" class="stats-list"></div>
+                </div>
+                <div class="stats-section">
+                    <h4>Hours per Client</h4>
+                    <div id="clientStats" class="stats-list"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Settings</h2>
+                <button class="close-btn" id="closeSettings">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="settings-section">
+                    <h3>Production Members</h3>
+                    <div class="settings-controls">
+                        <input type="text" id="newMemberName" placeholder="Member name" class="input-field">
+                        <button id="addMemberBtn" class="btn-primary">Add Member</button>
+                    </div>
+                    <div id="membersSettingsList" class="settings-list">
+                        <!-- Members list will be populated here -->
+                    </div>
+                </div>
+                <div class="settings-section">
+                    <h3>Clients</h3>
+                    <div class="settings-controls">
+                        <input type="text" id="newClientName" placeholder="Client name" class="input-field">
+                        <button id="addClientBtn" class="btn-primary">Add Client</button>
+                    </div>
+                    <div id="clientsSettingsList" class="settings-list">
+                        <!-- Clients list will be populated here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Client Selection Modal -->
+    <div id="clientModal" class="modal">
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h3>Select Client</h3>
+                <button class="close-btn" id="closeClientModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="clientSelectionList" class="client-selection-list">
+                    <!-- Client options will be populated here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

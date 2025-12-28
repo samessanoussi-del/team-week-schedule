@@ -348,6 +348,15 @@ function renderCalendar() {
                         renderCalendar();
                         updateStats();
                     };
+                    
+                    // Add hover effects to highlight the block red
+                    clearBtn.addEventListener('mouseenter', () => {
+                        timeBlock.classList.add('highlight-clear-block');
+                    });
+                    clearBtn.addEventListener('mouseleave', () => {
+                        timeBlock.classList.remove('highlight-clear-block');
+                    });
+                    
                     clearBtnContainer.appendChild(clearBtn);
                 }
                 
@@ -484,6 +493,8 @@ function renderCalendar() {
 
 // Add duplicate buttons between day columns
 function addDuplicateButtons() {
+    if (!isAdminMode) return; // Don't show duplicate buttons in view mode
+    
     const calendarGrid = document.getElementById('calendarGrid');
     const dayColumns = calendarGrid.querySelectorAll('.day-column');
     
@@ -504,10 +515,6 @@ function addDuplicateButtons() {
                 
                 duplicateBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    if (!isAdminMode) {
-                        document.getElementById('adminModal').classList.add('show');
-                        return;
-                    }
                     const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
                     const timeBlocks = ['Work1', 'Work2', 'Work3'];
                     const blockId = timeBlocks[blockIndex];
@@ -521,15 +528,15 @@ function addDuplicateButtons() {
                     if (sourceAssignments.length > 0) {
                         saveStateToHistory();
                         days.forEach((day, targetDayIndex) => {
-                            if (targetDayIndex !== dayIndex) {
+                            // Only overwrite days AFTER the source day, not before
+                            if (targetDayIndex > dayIndex) {
                                 const targetDate = new Date(currentWeekStart);
                                 targetDate.setDate(currentWeekStart.getDate() + targetDayIndex);
                                 const targetDateKey = formatDateKey(targetDate, day);
                                 const targetBlockKey = `${targetDateKey}-${blockId}`;
                                 
-                                if (!schedule[targetBlockKey] || schedule[targetBlockKey].length === 0) {
-                                    schedule[targetBlockKey] = JSON.parse(JSON.stringify(sourceAssignments));
-                                }
+                                // Always overwrite existing assignments
+                                schedule[targetBlockKey] = JSON.parse(JSON.stringify(sourceAssignments));
                             }
                         });
                         saveData();
@@ -875,6 +882,16 @@ function setupEventListeners() {
         }
     });
 
+    // Watermark click to show image modal
+    document.querySelector('.watermark').addEventListener('click', () => {
+        document.getElementById('watermarkModal').classList.add('show');
+    });
+
+    // Close watermark modal
+    document.getElementById('closeWatermarkModal').addEventListener('click', () => {
+        document.getElementById('watermarkModal').classList.remove('show');
+    });
+
     // Client modal
     document.getElementById('closeClientModal').addEventListener('click', closeClientModal);
 
@@ -883,6 +900,7 @@ function setupEventListeners() {
         const settingsModal = document.getElementById('settingsModal');
         const clientModal = document.getElementById('clientModal');
         const adminModal = document.getElementById('adminModal');
+        const watermarkModal = document.getElementById('watermarkModal');
         if (e.target === settingsModal) {
             settingsModal.classList.remove('show');
         }
@@ -893,6 +911,9 @@ function setupEventListeners() {
             adminModal.classList.remove('show');
             document.getElementById('adminPassword').value = '';
             document.getElementById('adminError').style.display = 'none';
+        }
+        if (e.target === watermarkModal) {
+            watermarkModal.classList.remove('show');
         }
     });
 

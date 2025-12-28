@@ -82,6 +82,9 @@
                 </div>
             </div>
         </div>
+        
+        <!-- Watermark -->
+        <div class="watermark">By Ravie</div>
     </div>
 
     <!-- Settings Modal -->
@@ -143,6 +146,18 @@
                 <input type="password" id="adminPassword" placeholder="Password" class="input-field" style="width: 100%; margin-bottom: 1rem;">
                 <button id="adminLoginBtn" class="btn-primary" style="width: 100%;">Enter Admin Mode</button>
                 <p id="adminError" style="color: #dc3545; margin-top: 0.5rem; font-size: 0.85rem; display: none;">Incorrect password</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Watermark Image Modal -->
+    <div id="watermarkModal" class="modal">
+        <div class="modal-content modal-image">
+            <div class="modal-header">
+                <button class="close-btn" id="closeWatermarkModal">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 0; text-align: center;">
+                <img src="ravie-image.png" alt="Ravie" id="ravieImage" style="max-width: 100%; height: auto; display: block;">
             </div>
         </div>
     </div>

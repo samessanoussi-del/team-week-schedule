@@ -1,3 +1,115 @@
+@font-face {
+    font-family: 'Acumin Pro';
+    src: url('fonts/fonnts.com-Acumin_Pro.otf') format('opentype');
+    font-weight: normal;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Acumin Pro';
+    src: url('fonts/fonnts.com-Acumin_Pro_Italic.otf') format('opentype');
+    font-weight: normal;
+    font-style: italic;
+}
+
+@font-face {
+    font-family: 'Acumin Pro';
+    src: url('fonts/fonnts.com-Acumin_Pro_Thin.otf') format('opentype');
+    font-weight: 100;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Acumin Pro';
+    src: url('fonts/fonnts.com-Acumin_Pro_Extra_Light.otf') format('opentype');
+    font-weight: 200;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Acumin Pro';
+    src: url('fonts/fonnts.com-Acumin_Pro_Light.otf') format('opentype');
+    font-weight: 300;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Acumin Pro';
+    src: url('fonts/fonnts.com-Acumin_Pro_Medium.otf') format('opentype');
+    font-weight: 500;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Acumin Pro';
+    src: url('fonts/fonnts.com-Acumin_Pro_Semibold.otf') format('opentype');
+    font-weight: 600;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Acumin Pro';
+    src: url('fonts/fonnts.com-Acumin_Pro_Bold.otf') format('opentype');
+    font-weight: 700;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Acumin Pro';
+    src: url('fonts/fonnts.com-Acumin_Pro_Black.otf') format('opentype');
+    font-weight: 900;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Acumin Pro';
+    src: url('fonts/fonnts.com-Acumin_Pro_Thin_Italic.otf') format('opentype');
+    font-weight: 100;
+    font-style: italic;
+}
+
+@font-face {
+    font-family: 'Acumin Pro';
+    src: url('fonts/fonnts.com-Acumin_Pro_Extra_Light_Italic.otf') format('opentype');
+    font-weight: 200;
+    font-style: italic;
+}
+
+@font-face {
+    font-family: 'Acumin Pro';
+    src: url('fonts/fonnts.com-Acumin_Pro_Light_Italic.otf') format('opentype');
+    font-weight: 300;
+    font-style: italic;
+}
+
+@font-face {
+    font-family: 'Acumin Pro';
+    src: url('fonts/fonnts.com-Acumin_Pro_Medium_Italic.otf') format('opentype');
+    font-weight: 500;
+    font-style: italic;
+}
+
+@font-face {
+    font-family: 'Acumin Pro';
+    src: url('fonts/fonnts.com-Acumin_Pro_Semibold_Italic.otf') format('opentype');
+    font-weight: 600;
+    font-style: italic;
+}
+
+@font-face {
+    font-family: 'Acumin Pro';
+    src: url('fonts/fonnts.com-Acumin_Pro_Bold_Italic.otf') format('opentype');
+    font-weight: 700;
+    font-style: italic;
+}
+
+@font-face {
+    font-family: 'Acumin Pro';
+    src: url('fonts/fonnts.com-Acumin_Pro_Black_Italic.otf') format('opentype');
+    font-weight: 900;
+    font-style: italic;
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -25,7 +137,7 @@
 }
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    font-family: 'Acumin Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
     transition: background-color 0.3s, color 0.3s;
 }
 
@@ -152,8 +264,15 @@ body.bright-theme .app-container {
 
 body.bright-theme .header {
     background: var(--bright-primary);
-    color: var(--bright-text);
+    color: var(--dark-text);
     border-bottom: 1px solid var(--bright-border);
+}
+
+/* Keep header text white in both themes */
+body.bright-theme .header h1,
+body.bright-theme .header .btn-nav,
+body.bright-theme .header .week-display {
+    color: var(--dark-text);
 }
 
 body.bright-theme .sidebar {
@@ -294,7 +413,8 @@ body.bright-theme .client-option:hover {
 }
 
 .mode-indicator {
-    padding: 0.25rem 0.75rem;
+    padding: 0.5rem;
+    height: 2rem;
     border-radius: 2px;
     font-size: 0.75rem;
     font-weight: 600;
@@ -302,6 +422,9 @@ body.bright-theme .client-option:hover {
     letter-spacing: 0.5px;
     cursor: pointer;
     transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .mode-indicator:hover {
@@ -317,19 +440,19 @@ body.bright-theme .client-option:hover {
 
 .mode-indicator.admin {
     background: rgba(40, 167, 69, 0.3);
-    color: rgba(255, 255, 255, 0.9);
+    color: var(--dark-text);
     border: 1px solid rgba(40, 167, 69, 0.5);
 }
 
 body.bright-theme .mode-indicator.view {
     background: rgba(108, 117, 125, 0.2);
-    color: rgba(16, 17, 16, 0.8);
+    color: rgba(255, 255, 255, 0.8);
     border: 1px solid rgba(108, 117, 125, 0.4);
 }
 
 body.bright-theme .mode-indicator.admin {
     background: rgba(40, 167, 69, 0.2);
-    color: rgba(16, 17, 16, 0.9);
+    color: var(--dark-text);
     border: 1px solid rgba(40, 167, 69, 0.4);
 }
 
@@ -1243,7 +1366,7 @@ body.bright-theme .stat-value {
     bottom: 0.5rem;
     right: 0.5rem;
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     gap: 0.25rem;
     align-items: flex-end;
     opacity: 0;
@@ -1251,8 +1374,25 @@ body.bright-theme .stat-value {
     z-index: 10;
 }
 
+/* Hide clear buttons in view mode */
+body:not(.admin-mode) .block-clear-buttons {
+    display: none !important;
+}
+
 .time-block.work-block:hover .block-clear-buttons {
     opacity: 1;
+}
+
+/* Highlight block red when hovering over Clear Block button */
+.time-block.work-block.highlight-clear-block {
+    background: rgba(220, 53, 69, 0.2) !important;
+    border: 2px solid rgba(220, 53, 69, 0.6) !important;
+    transition: all 0.2s;
+}
+
+body.bright-theme .time-block.work-block.highlight-clear-block {
+    background: rgba(220, 53, 69, 0.15) !important;
+    border: 2px solid rgba(220, 53, 69, 0.5) !important;
 }
 
 .block-clear-btn {
@@ -1319,7 +1459,59 @@ body.bright-theme .duplicate-btn {
     opacity: 1 !important;
 }
 
-/* Hide duplicate button in view mode */
+/* Hide duplicate buttons in view mode */
 body:not(.admin-mode) .duplicate-btn {
     display: none !important;
+}
+
+/* Watermark */
+.watermark {
+    position: fixed;
+    bottom: 1rem;
+    right: 1rem;
+    font-family: 'Acumin Pro', sans-serif;
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.3);
+    z-index: 50;
+    cursor: pointer;
+    user-select: none;
+    transition: opacity 0.2s;
+}
+
+.watermark:hover {
+    opacity: 0.6;
+}
+
+body.bright-theme .watermark {
+    color: rgba(16, 17, 16, 0.2);
+}
+
+body.bright-theme .watermark:hover {
+    opacity: 0.4;
+}
+
+/* Image Modal */
+.modal-image {
+    max-width: 90%;
+    max-height: 90vh;
+    width: auto;
+}
+
+.modal-image .modal-header {
+    padding: 0.5rem;
+    border-bottom: none;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.modal-image .close-btn {
+    background: rgba(0, 0, 0, 0.5);
+    color: white;
+    border-radius: 50%;
+    width: 35px;
+    height: 35px;
+}
+
+.modal-image .close-btn:hover {
+    background: rgba(0, 0, 0, 0.7);
 }

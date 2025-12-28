@@ -5,6 +5,8 @@ let schedule = {}; // Format: { "2024-01-15-Monday-Work1": [{ member: "John", cl
 let currentWeekStart = new Date();
 let isDarkTheme = true; // Default to dark theme
 let timeBlocks = []; // Format: [{ id: 'Work1', label: 'Work Block 1', time: '11:00 AM - 1:00 PM', startTime: '11:00', endTime: '13:00', isLunch: false }, ...]
+let isAdminMode = false; // View mode by default
+const ADMIN_PASSWORD = 'Ravie2026';
 
 // Undo/Redo system
 let undoHistory = [];
@@ -109,8 +111,20 @@ function loadData() {
             { id: 'Work3', label: 'Work Block 3', time: '4:00 PM - 6:00 PM', startTime: '16:00', endTime: '18:00', isLunch: false }
         ];
     }
+
+    // Load admin mode state - persists across browser sessions per device
+    const savedAdminMode = localStorage.getItem('isAdminMode');
+    if (savedAdminMode !== null) {
+        isAdminMode = savedAdminMode === 'true';
+    } else {
+        // Default to view mode
+        isAdminMode = false;
+    }
     
     applyTheme();
+    updateModeIndicator();
+    applyViewModeRestrictions();
+    applyAdminModeClass();
 }
 
 // Save state to history for undo
@@ -157,6 +171,7 @@ function saveData() {
     localStorage.setItem('currentWeekStart', currentWeekStart.toISOString());
     localStorage.setItem('isDarkTheme', isDarkTheme);
     localStorage.setItem('timeBlocks', JSON.stringify(timeBlocks));
+    localStorage.setItem('isAdminMode', isAdminMode);
 }
 
 // Initialize calendar
@@ -268,7 +283,7 @@ function renderCalendar() {
 
                     const assignmentDiv = document.createElement('div');
                     assignmentDiv.className = 'assignment';
-                    assignmentDiv.draggable = true;
+                    assignmentDiv.draggable = isAdminMode;
                     assignmentDiv.dataset.sourceBlock = blockKey;
                     assignmentDiv.dataset.assignmentIndex = assignmentIndex;
                     assignmentDiv.innerHTML = `
@@ -286,26 +301,28 @@ function renderCalendar() {
                             </div>
                             <div class="assignment-client-box" style="background-color: ${clientColor}">
                                 <span class="assignment-client-name">${assignment.client}</span>
-                                <button class="assignment-remove" onclick="removeAssignment('${blockKey}', ${assignmentIndex})">×</button>
+                                ${isAdminMode ? `<button class="assignment-remove" onclick="removeAssignment('${blockKey}', ${assignmentIndex})">×</button>` : ''}
                             </div>
                         </div>
                     `;
                     
-                    // Add drag event listeners
-                    assignmentDiv.addEventListener('dragstart', (e) => {
-                        e.dataTransfer.setData('text/plain', JSON.stringify({
-                            sourceBlock: blockKey,
-                            assignmentIndex: assignmentIndex,
-                            assignment: assignment
-                        }));
-                        assignmentDiv.classList.add('dragging-assignment');
-                        window.draggingAssignment = true;
-                    });
-                    
-                    assignmentDiv.addEventListener('dragend', () => {
-                        assignmentDiv.classList.remove('dragging-assignment');
-                        window.draggingAssignment = false;
-                    });
+                    // Add drag event listeners (only in admin mode)
+                    if (isAdminMode) {
+                        assignmentDiv.addEventListener('dragstart', (e) => {
+                            e.dataTransfer.setData('text/plain', JSON.stringify({
+                                sourceBlock: blockKey,
+                                assignmentIndex: assignmentIndex,
+                                assignment: assignment
+                            }));
+                            assignmentDiv.classList.add('dragging-assignment');
+                            window.draggingAssignment = true;
+                        });
+                        
+                        assignmentDiv.addEventListener('dragend', () => {
+                            assignmentDiv.classList.remove('dragging-assignment');
+                            window.draggingAssignment = false;
+                        });
+                    }
                     
                     assignmentsContainer.appendChild(assignmentDiv);
                 });
@@ -323,6 +340,7 @@ function renderCalendar() {
                     clearBtn.innerHTML = 'Clear Block';
                     clearBtn.title = 'Clear all assignments in this block';
                     clearBtn.onclick = (e) => {
+                        if (!isAdminMode) return;
                         e.stopPropagation();
                         saveStateToHistory();
                         delete schedule[blockKey];
@@ -354,6 +372,7 @@ function renderCalendar() {
                     clearHorizontalBtn.title = 'Clear all assignments for this time block across all days';
                     clearHorizontalBtn.dataset.blockId = block.id;
                     clearHorizontalBtn.onclick = (e) => {
+                        if (!isAdminMode) return;
                         e.stopPropagation();
                         saveStateToHistory();
                         days.forEach((dayName, dayIdx) => {
@@ -397,6 +416,7 @@ function renderCalendar() {
                     clearVerticalBtn.title = 'Clear all assignments for this day';
                     clearVerticalBtn.dataset.dateKey = dateKey;
                     clearVerticalBtn.onclick = (e) => {
+                        if (!isAdminMode) return;
                         e.stopPropagation();
                         saveStateToHistory();
                         workBlocks.forEach(workBlockId => {
@@ -421,8 +441,12 @@ function renderCalendar() {
                 
                 timeBlock.appendChild(clearBtnContainer);
 
-                // Make droppable
+                // Make droppable (only in admin mode)
                 timeBlock.addEventListener('dragover', (e) => {
+                    if (!isAdminMode) {
+                        e.preventDefault();
+                        return;
+                    }
                     e.preventDefault();
                     timeBlock.classList.add('drag-over');
                 });
@@ -432,6 +456,10 @@ function renderCalendar() {
                 });
 
                 timeBlock.addEventListener('drop', (e) => {
+                    if (!isAdminMode) {
+                        e.preventDefault();
+                        return;
+                    }
                     e.preventDefault();
                     timeBlock.classList.remove('drag-over');
                     
@@ -476,6 +504,10 @@ function addDuplicateButtons() {
                 
                 duplicateBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
+                    if (!isAdminMode) {
+                        document.getElementById('adminModal').classList.add('show');
+                        return;
+                    }
                     const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
                     const timeBlocks = ['Work1', 'Work2', 'Work3'];
                     const blockId = timeBlocks[blockIndex];
@@ -628,6 +660,8 @@ function closeClientModal() {
 
 // Assign member to block
 function assignMemberToBlock(memberName, clientName, blockKey) {
+    if (!isAdminMode) return;
+    
     if (!schedule[blockKey]) {
         schedule[blockKey] = [];
     }
@@ -654,6 +688,8 @@ function assignMemberToBlock(memberName, clientName, blockKey) {
 
 // Remove assignment
 function removeAssignment(blockKey, assignmentIndex) {
+    if (!isAdminMode) return;
+    
     saveStateToHistory();
     if (schedule[blockKey] && Array.isArray(schedule[blockKey])) {
         schedule[blockKey].splice(assignmentIndex, 1);
@@ -677,7 +713,7 @@ function renderSidebar() {
     teamMembers.forEach(member => {
         const item = document.createElement('div');
         item.className = 'draggable-item';
-        item.draggable = true;
+        item.draggable = isAdminMode;
         const profileDisplay = member.profilePicture ? 
             `<img src="${member.profilePicture}" alt="${member.name}" class="sidebar-profile-picture">` : 
             `<div class="sidebar-profile-initial">${member.name.charAt(0).toUpperCase()}</div>`;
@@ -690,14 +726,16 @@ function renderSidebar() {
         item.dataset.type = 'member';
         item.dataset.value = member.name;
         
-        item.addEventListener('dragstart', (e) => {
-            e.dataTransfer.setData('text/plain', `member:${member.name}`);
-            item.classList.add('dragging');
-        });
+        if (isAdminMode) {
+            item.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', `member:${member.name}`);
+                item.classList.add('dragging');
+            });
 
-        item.addEventListener('dragend', () => {
-            item.classList.remove('dragging');
-        });
+            item.addEventListener('dragend', () => {
+                item.classList.remove('dragging');
+            });
+        }
 
         membersList.appendChild(item);
     });
@@ -723,8 +761,10 @@ function renderSettings() {
     teamMembers.forEach((member, index) => {
         const item = document.createElement('div');
         item.className = 'settings-item';
+        const disabledAttr = isAdminMode ? '' : 'disabled';
+        const disabledStyle = isAdminMode ? '' : 'opacity: 0.5; pointer-events: none;';
         item.innerHTML = `
-            <div class="settings-item-profile-section">
+            <div class="settings-item-profile-section" style="${disabledStyle}">
                 <div class="profile-picture-container">
                     <label for="memberProfile${index}" class="profile-picture-label">
                         ${member.profilePicture ? 
@@ -733,18 +773,18 @@ function renderSettings() {
                         }
                     </label>
                     <input type="file" id="memberProfile${index}" accept="image/*" 
-                           onchange="updateMemberProfile(${index}, this)" class="profile-picture-input" style="display: none;">
+                           onchange="updateMemberProfile(${index}, this)" class="profile-picture-input" style="display: none;" ${disabledAttr}>
                 </div>
                 <div class="settings-item-color-picker">
                     <input type="color" id="memberColor${index}" value="${member.color}" 
-                           onchange="updateMemberColor(${index}, this.value)" class="color-picker">
+                           onchange="updateMemberColor(${index}, this.value)" class="color-picker" ${disabledAttr}>
                     <label for="memberColor${index}" class="color-picker-label"></label>
                 </div>
             </div>
             <span class="settings-item-name">${member.name}</span>
-            <div class="settings-item-actions">
-                <button class="btn-edit" onclick="editMember(${index})">Edit</button>
-                <button class="btn-delete" onclick="deleteMember(${index})">Delete</button>
+            <div class="settings-item-actions" style="${disabledStyle}">
+                <button class="btn-edit" onclick="editMember(${index})" ${disabledAttr}>Edit</button>
+                <button class="btn-delete" onclick="deleteMember(${index})" ${disabledAttr}>Delete</button>
             </div>
         `;
         membersList.appendChild(item);
@@ -754,16 +794,18 @@ function renderSettings() {
     clients.forEach((client, index) => {
         const item = document.createElement('div');
         item.className = 'settings-item';
+        const disabledAttr = isAdminMode ? '' : 'disabled';
+        const disabledStyle = isAdminMode ? '' : 'opacity: 0.5; pointer-events: none;';
         item.innerHTML = `
-            <div class="settings-item-color-picker">
+            <div class="settings-item-color-picker" style="${disabledStyle}">
                 <input type="color" id="clientColor${index}" value="${client.color}" 
-                       onchange="updateClientColor(${index}, this.value)" class="color-picker">
+                       onchange="updateClientColor(${index}, this.value)" class="color-picker" ${disabledAttr}>
                 <label for="clientColor${index}" class="color-picker-label"></label>
             </div>
             <span class="settings-item-name">${client.name}</span>
-            <div class="settings-item-actions">
-                <button class="btn-edit" onclick="editClient(${index})">Edit</button>
-                <button class="btn-delete" onclick="deleteClient(${index})">Delete</button>
+            <div class="settings-item-actions" style="${disabledStyle}">
+                <button class="btn-edit" onclick="editClient(${index})" ${disabledAttr}>Edit</button>
+                <button class="btn-delete" onclick="deleteClient(${index})" ${disabledAttr}>Delete</button>
             </div>
         `;
         clientsList.appendChild(item);
@@ -774,12 +816,63 @@ function renderSettings() {
 function setupEventListeners() {
     // Settings modal
     document.getElementById('settingsBtn').addEventListener('click', () => {
-        document.getElementById('settingsModal').classList.add('show');
-        renderSettings();
+        if (!isAdminMode) {
+            // Show admin login modal instead
+            document.getElementById('adminModal').classList.add('show');
+        } else {
+            document.getElementById('settingsModal').classList.add('show');
+            renderSettings();
+        }
     });
 
     document.getElementById('closeSettings').addEventListener('click', () => {
         document.getElementById('settingsModal').classList.remove('show');
+    });
+
+    // Admin modal close button
+    document.getElementById('closeAdminModal').addEventListener('click', () => {
+        document.getElementById('adminModal').classList.remove('show');
+        document.getElementById('adminPassword').value = '';
+        document.getElementById('adminError').style.display = 'none';
+    });
+
+    // Admin login button
+    document.getElementById('adminLoginBtn').addEventListener('click', () => {
+        const password = document.getElementById('adminPassword').value;
+        const errorMsg = document.getElementById('adminError');
+        
+        if (password === ADMIN_PASSWORD) {
+            isAdminMode = true;
+            saveData(); // Save admin mode to localStorage - will persist across sessions
+            applyViewModeRestrictions();
+            document.getElementById('adminModal').classList.remove('show');
+            document.getElementById('adminPassword').value = '';
+            errorMsg.style.display = 'none';
+        } else {
+            errorMsg.style.display = 'block';
+            document.getElementById('adminPassword').value = '';
+        }
+    });
+
+    // Enter key support for admin password
+    document.getElementById('adminPassword').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            document.getElementById('adminLoginBtn').click();
+        }
+    });
+
+    // Mode indicator click to show admin modal or exit admin mode
+    document.getElementById('modeIndicator').addEventListener('click', () => {
+        if (!isAdminMode) {
+            document.getElementById('adminModal').classList.add('show');
+        } else {
+            // Exit admin mode
+            if (confirm('Exit Admin Mode?')) {
+                isAdminMode = false;
+                saveData(); // Save admin mode state - will persist across sessions
+                applyViewModeRestrictions();
+            }
+        }
     });
 
     // Client modal
@@ -789,16 +882,23 @@ function setupEventListeners() {
     window.addEventListener('click', (e) => {
         const settingsModal = document.getElementById('settingsModal');
         const clientModal = document.getElementById('clientModal');
+        const adminModal = document.getElementById('adminModal');
         if (e.target === settingsModal) {
             settingsModal.classList.remove('show');
         }
         if (e.target === clientModal) {
             closeClientModal();
         }
+        if (e.target === adminModal) {
+            adminModal.classList.remove('show');
+            document.getElementById('adminPassword').value = '';
+            document.getElementById('adminError').style.display = 'none';
+        }
     });
 
     // Add member
     document.getElementById('addMemberBtn').addEventListener('click', () => {
+        if (!isAdminMode) return;
         const input = document.getElementById('newMemberName');
         const name = input.value.trim();
         if (name && !teamMembers.find(m => m.name === name)) {
@@ -820,6 +920,7 @@ function setupEventListeners() {
 
     // Add client
     document.getElementById('addClientBtn').addEventListener('click', () => {
+        if (!isAdminMode) return;
         const input = document.getElementById('newClientName');
         const name = input.value.trim();
         if (name && !clients.find(c => c.name === name)) {
@@ -896,6 +997,7 @@ function updateWeekDisplay() {
 
 // Update member color
 function updateMemberColor(index, color) {
+    if (!isAdminMode) return;
     teamMembers[index].color = color;
     saveData();
     renderSidebar();
@@ -905,6 +1007,7 @@ function updateMemberColor(index, color) {
 
 // Update member profile picture
 function updateMemberProfile(index, input) {
+    if (!isAdminMode) return;
     const file = input.files[0];
     if (file) {
         const reader = new FileReader();
@@ -921,6 +1024,7 @@ function updateMemberProfile(index, input) {
 
 // Update client color
 function updateClientColor(index, color) {
+    if (!isAdminMode) return;
     clients[index].color = color;
     saveData();
     renderSidebar();
@@ -959,6 +1063,7 @@ function editMember(index) {
 
 // Delete member
 function deleteMember(index) {
+    if (!isAdminMode) return;
     saveStateToHistory();
     const memberName = teamMembers[index].name;
     teamMembers.splice(index, 1);
@@ -982,6 +1087,7 @@ function deleteMember(index) {
 
 // Edit client
 function editClient(index) {
+    if (!isAdminMode) return;
     const newName = prompt('Enter new name:', clients[index].name);
     if (newName && newName.trim() && !clients.find(c => c.name === newName.trim())) {
         saveStateToHistory();
@@ -1011,6 +1117,7 @@ function editClient(index) {
 
 // Delete client
 function deleteClient(index) {
+    if (!isAdminMode) return;
     saveStateToHistory();
     const clientName = clients[index].name;
     clients.splice(index, 1);
@@ -1036,6 +1143,15 @@ function deleteClient(index) {
 function applyTheme() {
     document.body.classList.toggle('dark-theme', isDarkTheme);
     document.body.classList.toggle('bright-theme', !isDarkTheme);
+}
+
+// Apply admin mode class to body
+function applyAdminModeClass() {
+    if (isAdminMode) {
+        document.body.classList.add('admin-mode');
+    } else {
+        document.body.classList.remove('admin-mode');
+    }
 }
 
 // Highlight horizontal blocks (all days for a time block)
@@ -1091,6 +1207,7 @@ function clearHighlights() {
 
 // Show add block modal
 function showAddBlockModal() {
+    if (!isAdminMode) return;
     const startTime = prompt('Enter start time (e.g., 9:00 AM):');
     if (!startTime) return;
     
@@ -1127,6 +1244,7 @@ function showAddBlockModal() {
 
 // Delete time block
 function deleteTimeBlock(blockIndex) {
+    if (!isAdminMode) return;
     const block = timeBlocks[blockIndex];
     if (block.isLunch) {
         alert('Lunch time cannot be deleted.');
@@ -1163,6 +1281,7 @@ function deleteTimeBlock(blockIndex) {
 
 // Edit time block
 function editTimeBlock(blockIndex) {
+    if (!isAdminMode) return;
     const block = timeBlocks[blockIndex];
     if (block.isLunch) {
         alert('Lunch time cannot be edited. You can delete and recreate it if needed.');
@@ -1315,5 +1434,32 @@ function updateStats() {
         `;
         clientStatsDiv.appendChild(statItem);
     });
+}
+
+// Update mode indicator
+function updateModeIndicator() {
+    const indicator = document.getElementById('modeIndicator');
+    if (indicator) {
+        indicator.textContent = isAdminMode ? 'Admin Mode' : 'View Mode';
+        indicator.className = isAdminMode ? 'mode-indicator admin' : 'mode-indicator view';
+    }
+}
+
+// Apply view mode restrictions
+function applyViewModeRestrictions() {
+    // Disable/enable draggable items
+    renderSidebar();
+    
+    // Hide/show edit controls in settings
+    renderSettings();
+    
+    // Disable/enable calendar interactions
+    renderCalendar();
+    
+    // Update mode indicator
+    updateModeIndicator();
+    
+    // Apply admin mode class to body
+    applyAdminModeClass();
 }
 

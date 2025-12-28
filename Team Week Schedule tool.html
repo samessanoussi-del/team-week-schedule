@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Team Week Schedule</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -11,12 +12,15 @@
         <!-- Header -->
         <header class="header">
             <h1>Team Week Schedule</h1>
-            <div class="header-controls">
+            <div class="header-center">
                 <button id="prevWeek" class="btn-nav">← Previous Week</button>
                 <span id="weekDisplay" class="week-display"></span>
                 <button id="nextWeek" class="btn-nav">Next Week →</button>
+            </div>
+            <div class="header-controls">
+                <div id="modeIndicator" class="mode-indicator">View Mode</div>
                 <button id="themeToggle" class="btn-theme-toggle" title="Toggle theme">🌓</button>
-                <button id="settingsBtn" class="btn-settings">⚙️ Settings</button>
+                <button id="settingsBtn" class="btn-settings" title="Settings">⚙️</button>
             </div>
         </header>
 
@@ -123,6 +127,22 @@
                 <div id="clientSelectionList" class="client-selection-list">
                     <!-- Client options will be populated here -->
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Login Modal -->
+    <div id="adminModal" class="modal">
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h3>Enter Admin Mode</h3>
+                <button class="close-btn" id="closeAdminModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 1rem; color: var(--dark-text);">Enter password to enable editing:</p>
+                <input type="password" id="adminPassword" placeholder="Password" class="input-field" style="width: 100%; margin-bottom: 1rem;">
+                <button id="adminLoginBtn" class="btn-primary" style="width: 100%;">Enter Admin Mode</button>
+                <p id="adminError" style="color: #dc3545; margin-top: 0.5rem; font-size: 0.85rem; display: none;">Incorrect password</p>
             </div>
         </div>
     </div>

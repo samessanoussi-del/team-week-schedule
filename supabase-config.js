@@ -7,17 +7,21 @@ const SUPABASE_ANON_KEY = 'sb_publishable_bP_8yIIapX7PmstFuzrXxw_bAKYzL3k';
 
 // Initialize Supabase client
 // The UMD build exposes it as window.supabase
-let supabase;
+// Use a different variable name to avoid conflicts
+var supabaseClient;
 try {
     if (typeof window !== 'undefined' && window.supabase) {
-        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        console.log('Supabase client initialized successfully');
+        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        console.log('✅ Supabase client initialized successfully');
     } else {
-        console.warn('Supabase library not loaded. Make sure the script is included before this file.');
-        supabase = undefined;
+        console.warn('⚠️ Supabase library not loaded. Make sure the script is included before this file.');
+        supabaseClient = undefined;
     }
 } catch (error) {
-    console.error('Error initializing Supabase:', error);
-    supabase = undefined;
+    console.error('❌ Error initializing Supabase:', error);
+    supabaseClient = undefined;
 }
+
+// Export as 'supabase' for use in app.js
+const supabase = supabaseClient;
 

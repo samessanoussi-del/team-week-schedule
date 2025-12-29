@@ -1984,19 +1984,7 @@ function setupEventListeners() {
         });
     }
     
-    // Sync time tracking week with main calendar when settings opens
-    const settingsBtn = document.getElementById('settingsBtn');
-    if (settingsBtn) {
-        // Get the existing click handler
-        const existingHandler = settingsBtn.onclick;
-        settingsBtn.addEventListener('click', () => {
-            if (isAdminMode) {
-                // Sync time tracking week with current calendar week
-                window.timeTrackingWeekStart = new Date(currentWeekStart);
-                // renderTimeTracking will be called by renderSettings
-            }
-        });
-    }
+    // Time tracking is now in sidebar, so it doesn't need to sync with settings opening
 }
 
 // Update week display

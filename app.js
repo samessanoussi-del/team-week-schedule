@@ -1686,7 +1686,7 @@ function renderTimeTracking() {
                 <h4>${member.name}</h4>
                 <div class="member-totals">
                     <span>Total Assigned: ${totalAssigned.toFixed(1)}h</span>
-                    <span>Total Actual: ${totalActual.toFixed(1)}h</span>
+                    <span>Total Toggl: ${totalActual.toFixed(1)}h</span>
                 </div>
             </div>
             <div class="member-clients-list">`;
@@ -1707,7 +1707,7 @@ function renderTimeTracking() {
                     <span class="assigned-hours">${assigned.toFixed(1)}h assigned</span>
                 </div>
                 <div class="client-input-section">
-                    <label>Actual:</label>
+                    <label>Toggl:</label>
                     <input type="number" step="0.1" min="0" value="${actual}" 
                         onchange="updateTimeTracking('${weekKey}', '${member.name}', '${clientName}', this.value)" 
                         class="time-input" ${isAdminMode ? '' : 'disabled'}>
@@ -1731,7 +1731,7 @@ function renderTimeTracking() {
                         <span class="assigned-hours">0h assigned</span>
                     </div>
                     <div class="client-input-section">
-                        <label>Actual:</label>
+                        <label>Toggl:</label>
                         <input type="number" step="0.1" min="0" value="${actual}" 
                             onchange="updateTimeTracking('${weekKey}', '${member.name}', '${clientName}', this.value)" 
                             class="time-input" ${isAdminMode ? '' : 'disabled'}>

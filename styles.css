@@ -1047,6 +1047,24 @@ body.bright-theme .close-btn:hover {
     padding: 1.5rem;
 }
 
+.settings-layout {
+    display: flex;
+    gap: 2rem;
+    align-items: flex-start;
+}
+
+.settings-left-column {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.settings-right-column {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
 .settings-section {
     margin-bottom: 2rem;
 }

@@ -96,37 +96,43 @@
                 <button class="close-btn" id="closeSettings">&times;</button>
             </div>
             <div class="modal-body">
-                <div class="settings-section">
-                    <h3>Production Members</h3>
-                    <div class="settings-controls">
-                        <input type="text" id="newMemberName" placeholder="Member name" class="input-field">
-                        <button id="addMemberBtn" class="btn-primary">Add Member</button>
-                    </div>
-                    <div id="membersSettingsList" class="settings-list">
-                        <!-- Members list will be populated here -->
-                    </div>
-                </div>
-                <div class="settings-section">
-                    <h3>Clients</h3>
-                    <div class="settings-controls">
-                        <input type="text" id="newClientName" placeholder="Client name" class="input-field">
-                        <button id="addClientBtn" class="btn-primary">Add Client</button>
-                    </div>
-                    <div id="clientsSettingsList" class="settings-list">
-                        <!-- Clients list will be populated here -->
-                    </div>
-                </div>
-                <div class="settings-section">
-                    <h3>Weekly Time Tracking</h3>
-                    <div class="time-tracking-controls">
-                        <div style="display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem;">
-                            <button id="timeTrackingPrevWeek" class="btn-nav" style="font-size: 0.9rem; padding: 0.5rem 1rem;">← Previous Week</button>
-                            <span id="timeTrackingWeekDisplay" class="week-display" style="flex: 1; text-align: center; font-weight: 600; color: var(--dark-primary);"></span>
-                            <button id="timeTrackingNextWeek" class="btn-nav" style="font-size: 0.9rem; padding: 0.5rem 1rem;">Next Week →</button>
+                <div class="settings-layout">
+                    <div class="settings-left-column">
+                        <div class="settings-section">
+                            <h3>Production Members</h3>
+                            <div class="settings-controls">
+                                <input type="text" id="newMemberName" placeholder="Member name" class="input-field">
+                                <button id="addMemberBtn" class="btn-primary">Add Member</button>
+                            </div>
+                            <div id="membersSettingsList" class="settings-list">
+                                <!-- Members list will be populated here -->
+                            </div>
+                        </div>
+                        <div class="settings-section">
+                            <h3>Clients</h3>
+                            <div class="settings-controls">
+                                <input type="text" id="newClientName" placeholder="Client name" class="input-field">
+                                <button id="addClientBtn" class="btn-primary">Add Client</button>
+                            </div>
+                            <div id="clientsSettingsList" class="settings-list">
+                                <!-- Clients list will be populated here -->
+                            </div>
                         </div>
                     </div>
-                    <div id="timeTrackingContent" class="time-tracking-content">
-                        <!-- Time tracking will be populated here -->
+                    <div class="settings-right-column">
+                        <div class="settings-section">
+                            <h3>Weekly Time Tracking</h3>
+                            <div class="time-tracking-controls">
+                                <div style="display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem;">
+                                    <button id="timeTrackingPrevWeek" class="btn-nav" style="font-size: 0.9rem; padding: 0.5rem 1rem;">← Previous Week</button>
+                                    <span id="timeTrackingWeekDisplay" class="week-display" style="flex: 1; text-align: center; font-weight: 600; color: var(--dark-primary);"></span>
+                                    <button id="timeTrackingNextWeek" class="btn-nav" style="font-size: 0.9rem; padding: 0.5rem 1rem;">Next Week →</button>
+                                </div>
+                            </div>
+                            <div id="timeTrackingContent" class="time-tracking-content">
+                                <!-- Time tracking will be populated here -->
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

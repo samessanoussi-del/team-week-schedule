@@ -874,6 +874,7 @@ body.bright-theme .time-block.work-block.highlight-clear {
     border-radius: 50px 0 0 50px;
     position: relative;
     z-index: 2;
+    padding-right: 20px;
 }
 
 .assignment-member-circle {
@@ -927,7 +928,7 @@ body.bright-theme .time-block.work-block.highlight-clear {
     justify-content: space-between;
     padding: 0.5rem 1rem;
     position: relative;
-    border-radius: 50px;
+    border-radius: 0 50px 50px 0;
     margin-left: -20px;
     padding-left: calc(1rem + 20px);
     z-index: 1;

@@ -983,7 +983,7 @@ body.bright-theme .time-block.work-block.highlight-clear {
 .modal-content {
     border-radius: 2px;
     box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-    max-width: 600px;
+    max-width: 1200px;
     width: 90%;
     max-height: 80vh;
     overflow-y: auto;

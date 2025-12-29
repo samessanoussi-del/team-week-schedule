@@ -793,6 +793,31 @@ async function saveData() {
 function initializeCalendar() {
     renderCalendar();
     updateWeekDisplay();
+    updateDayHeaders();
+}
+
+// Update day headers to highlight today
+function updateDayHeaders() {
+    const dayHeaders = document.querySelectorAll('.day-header');
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+    
+    // Get today's date for comparison
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    dayHeaders.forEach((header, dayIndex) => {
+        const dayDate = new Date(currentWeekStart);
+        dayDate.setDate(currentWeekStart.getDate() + dayIndex);
+        dayDate.setHours(0, 0, 0, 0);
+        
+        // Check if this day is today
+        const isToday = dayDate.getTime() === today.getTime();
+        if (isToday) {
+            header.classList.add('today');
+        } else {
+            header.classList.remove('today');
+        }
+    });
 }
 
 // Render time column

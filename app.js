@@ -1571,11 +1571,6 @@ function renderTimeTracking() {
     const weekStart = new Date(currentWeekStart);
     weekStart.setHours(0, 0, 0, 0);
     
-    // Calculate assigned hours from schedule
-    const assignedHours = calculateAssignedHours(weekStart);
-    const weekKey = getWeekKey(weekStart);
-    const actualHours = weeklyTimeTracking[weekKey] || {};
-    
     // Update the week display to match current week
     const weekEnd = new Date(weekStart);
     weekEnd.setDate(weekStart.getDate() + 4); // Monday to Friday
@@ -1588,6 +1583,14 @@ function renderTimeTracking() {
     if (weekDisplay) {
         weekDisplay.textContent = `${startStr} - ${endStr} (EST)`;
     }
+    
+    // Calculate assigned hours from schedule
+    const assignedHours = calculateAssignedHours(weekStart);
+    const weekKey = getWeekKey(weekStart);
+    const actualHours = weeklyTimeTracking[weekKey] || {};
+    
+    // Debug: log what we found
+    console.log('Time tracking for week:', weekKey, 'Week start:', weekStart, 'Assigned hours:', assignedHours);
     
     // Build member panels - show ALL members who have assignments
     let html = '<div class="time-tracking-members">';

@@ -950,6 +950,7 @@ body.bright-theme .time-block.work-block.highlight-clear {
     justify-content: space-between;
     padding: 0.5rem 1rem;
     position: relative;
+    border-radius: 0 50px 50px 0;
 }
 
 .assignment-client-name {

@@ -33,6 +33,12 @@ let realtimeChannels = {
 
 // Setup real-time subscriptions
 function setupRealtimeSubscriptions() {
+    // Check if supabase is available
+    if (typeof supabase === 'undefined') {
+        console.warn('Supabase not available, real-time subscriptions disabled');
+        return;
+    }
+    
     // Subscribe to team_members changes
     realtimeChannels.teamMembers = supabase
         .channel('team_members_changes')
@@ -79,6 +85,22 @@ function setupRealtimeSubscriptions() {
 
 // Load team members from Supabase
 async function loadTeamMembers() {
+    // Check if supabase is available
+    if (typeof supabase === 'undefined') {
+        console.warn('Supabase not available, using localStorage');
+        const savedMembers = localStorage.getItem('teamMembers');
+        if (savedMembers) {
+            teamMembers = JSON.parse(savedMembers);
+        } else {
+            teamMembers = [
+                { name: 'John Doe', color: '#ce2828', profilePicture: '' },
+                { name: 'Jane Smith', color: '#4a90e2', profilePicture: '' },
+                { name: 'Bob Johnson', color: '#50c878', profilePicture: '' }
+            ];
+        }
+        return;
+    }
+    
     try {
         const { data, error } = await supabase
             .from('team_members')
@@ -100,8 +122,8 @@ async function loadTeamMembers() {
                 { name: 'Jane Smith', color: '#4a90e2', profilePicture: '' },
                 { name: 'Bob Johnson', color: '#50c878', profilePicture: '' }
             ];
-            // Save defaults to database
-            await saveTeamMembers();
+            // Save defaults to database (don't await - let it happen in background)
+            saveTeamMembers().catch(err => console.error('Failed to save default team members:', err));
         }
     } catch (error) {
         console.error('Error loading team members:', error);
@@ -109,12 +131,35 @@ async function loadTeamMembers() {
         const savedMembers = localStorage.getItem('teamMembers');
         if (savedMembers) {
             teamMembers = JSON.parse(savedMembers);
+        } else {
+            // If no localStorage data, use defaults
+            teamMembers = [
+                { name: 'John Doe', color: '#ce2828', profilePicture: '' },
+                { name: 'Jane Smith', color: '#4a90e2', profilePicture: '' },
+                { name: 'Bob Johnson', color: '#50c878', profilePicture: '' }
+            ];
         }
     }
 }
 
 // Load clients from Supabase
 async function loadClients() {
+    // Check if supabase is available
+    if (typeof supabase === 'undefined') {
+        console.warn('Supabase not available, using localStorage');
+        const savedClients = localStorage.getItem('clients');
+        if (savedClients) {
+            clients = JSON.parse(savedClients);
+        } else {
+            clients = [
+                { name: 'Client A', color: '#667eea' },
+                { name: 'Client B', color: '#764ba2' },
+                { name: 'Client C', color: '#f093fb' }
+            ];
+        }
+        return;
+    }
+    
     try {
         const { data, error } = await supabase
             .from('clients')
@@ -135,8 +180,8 @@ async function loadClients() {
                 { name: 'Client B', color: '#764ba2' },
                 { name: 'Client C', color: '#f093fb' }
             ];
-            // Save defaults to database
-            await saveClients();
+            // Save defaults to database (don't await - let it happen in background)
+            saveClients().catch(err => console.error('Failed to save default clients:', err));
         }
     } catch (error) {
         console.error('Error loading clients:', error);
@@ -144,12 +189,35 @@ async function loadClients() {
         const savedClients = localStorage.getItem('clients');
         if (savedClients) {
             clients = JSON.parse(savedClients);
+        } else {
+            // If no localStorage data, use defaults
+            clients = [
+                { name: 'Client A', color: '#667eea' },
+                { name: 'Client B', color: '#764ba2' },
+                { name: 'Client C', color: '#f093fb' }
+            ];
         }
     }
 }
 
 // Load schedule from Supabase
 async function loadSchedule() {
+    // Check if supabase is available
+    if (typeof supabase === 'undefined') {
+        console.warn('Supabase not available, using localStorage');
+        const savedSchedule = localStorage.getItem('schedule');
+        if (savedSchedule) {
+            schedule = JSON.parse(savedSchedule);
+            // Migrate old single assignment format to array format
+            Object.keys(schedule).forEach(key => {
+                if (schedule[key] && !Array.isArray(schedule[key])) {
+                    schedule[key] = [schedule[key]];
+                }
+            });
+        }
+        return;
+    }
+    
     try {
         const { data, error } = await supabase
             .from('schedule')
@@ -181,6 +249,39 @@ async function loadSchedule() {
 
 // Load app settings from Supabase
 async function loadAppSettings() {
+    // Check if supabase is available
+    if (typeof supabase === 'undefined') {
+        console.warn('Supabase not available, using localStorage');
+        const savedTimeBlocks = localStorage.getItem('timeBlocks');
+        if (savedTimeBlocks) {
+            timeBlocks = JSON.parse(savedTimeBlocks);
+        } else {
+            timeBlocks = [
+                { id: 'Work1', label: 'Work Block 1', time: '11:00 AM - 1:00 PM', startTime: '11:00', endTime: '13:00', isLunch: false },
+                { id: 'Lunch', label: 'Lunch', time: '1:00 PM - 2:00 PM', startTime: '13:00', endTime: '14:00', isLunch: true },
+                { id: 'Work2', label: 'Work Block 2', time: '2:00 PM - 4:00 PM', startTime: '14:00', endTime: '16:00', isLunch: false },
+                { id: 'Work3', label: 'Work Block 3', time: '4:00 PM - 6:00 PM', startTime: '16:00', endTime: '18:00', isLunch: false }
+            ];
+        }
+
+        const savedWeek = localStorage.getItem('currentWeekStart');
+        if (savedWeek) {
+            currentWeekStart = new Date(savedWeek);
+        } else {
+            const today = new Date();
+            const day = today.getDay();
+            const diff = today.getDate() - day + (day === 0 ? -6 : 1);
+            currentWeekStart = new Date(today.setDate(diff));
+            currentWeekStart.setHours(0, 0, 0, 0);
+        }
+
+        const savedTheme = localStorage.getItem('isDarkTheme');
+        if (savedTheme !== null) {
+            isDarkTheme = savedTheme === 'true';
+        }
+        return;
+    }
+    
     try {
         const { data, error } = await supabase
             .from('app_settings')
@@ -208,7 +309,8 @@ async function loadAppSettings() {
                 { id: 'Work2', label: 'Work Block 2', time: '2:00 PM - 4:00 PM', startTime: '14:00', endTime: '16:00', isLunch: false },
                 { id: 'Work3', label: 'Work Block 3', time: '4:00 PM - 6:00 PM', startTime: '16:00', endTime: '18:00', isLunch: false }
             ];
-            await saveAppSettings();
+            // Save defaults to database (don't await - let it happen in background)
+            saveAppSettings().catch(err => console.error('Failed to save default time blocks:', err));
         }
 
         if (!currentWeekStart) {
@@ -311,9 +413,25 @@ function undo() {
 
 // Save team members to Supabase
 async function saveTeamMembers() {
+    // Check if supabase is available
+    if (typeof supabase === 'undefined') {
+        localStorage.setItem('teamMembers', JSON.stringify(teamMembers));
+        return;
+    }
+    
     try {
-        // Delete all existing members
-        await supabase.from('team_members').delete().neq('id', 0);
+        // Get all existing members first
+        const { data: existing } = await supabase.from('team_members').select('id');
+        
+        // Delete all existing members if any
+        if (existing && existing.length > 0) {
+            const idsToDelete = existing.map(m => m.id);
+            const { error: deleteError } = await supabase
+                .from('team_members')
+                .delete()
+                .in('id', idsToDelete);
+            if (deleteError) throw deleteError;
+        }
         
         // Insert all current members
         if (teamMembers.length > 0) {
@@ -338,9 +456,25 @@ async function saveTeamMembers() {
 
 // Save clients to Supabase
 async function saveClients() {
+    // Check if supabase is available
+    if (typeof supabase === 'undefined') {
+        localStorage.setItem('clients', JSON.stringify(clients));
+        return;
+    }
+    
     try {
-        // Delete all existing clients
-        await supabase.from('clients').delete().neq('id', 0);
+        // Get all existing clients first
+        const { data: existing } = await supabase.from('clients').select('id');
+        
+        // Delete all existing clients if any
+        if (existing && existing.length > 0) {
+            const idsToDelete = existing.map(c => c.id);
+            const { error: deleteError } = await supabase
+                .from('clients')
+                .delete()
+                .in('id', idsToDelete);
+            if (deleteError) throw deleteError;
+        }
         
         // Insert all current clients
         if (clients.length > 0) {
@@ -364,6 +498,12 @@ async function saveClients() {
 
 // Save schedule to Supabase
 async function saveSchedule() {
+    // Check if supabase is available
+    if (typeof supabase === 'undefined') {
+        localStorage.setItem('schedule', JSON.stringify(schedule));
+        return;
+    }
+    
     try {
         // Get all current schedule entries
         const scheduleEntries = Object.keys(schedule).map(blockKey => ({
@@ -371,8 +511,18 @@ async function saveSchedule() {
             assignments: schedule[blockKey]
         }));
 
-        // Delete all existing schedule entries
-        await supabase.from('schedule').delete().neq('id', 0);
+        // Get all existing schedule entries first
+        const { data: existing } = await supabase.from('schedule').select('id');
+        
+        // Delete all existing schedule entries if any
+        if (existing && existing.length > 0) {
+            const idsToDelete = existing.map(s => s.id);
+            const { error: deleteError } = await supabase
+                .from('schedule')
+                .delete()
+                .in('id', idsToDelete);
+            if (deleteError) throw deleteError;
+        }
 
         // Insert all current schedule entries
         if (scheduleEntries.length > 0) {

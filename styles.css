@@ -1515,3 +1515,122 @@ body.bright-theme .watermark:hover {
 .modal-image .close-btn:hover {
     background: rgba(0, 0, 0, 0.7);
 }
+
+/* Time Tracking */
+.time-tracking-controls {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.time-tracking-controls label {
+    font-weight: 500;
+}
+
+.time-tracking-controls input[type="week"] {
+    padding: 0.5rem;
+    border: 1px solid var(--dark-border);
+    border-radius: 4px;
+    background: var(--dark-bg);
+    color: var(--dark-text);
+}
+
+body.bright-theme .time-tracking-controls input[type="week"] {
+    border-color: var(--bright-border);
+    background: var(--bright-bg);
+    color: var(--bright-text);
+}
+
+.time-tracking-summary {
+    margin-top: 1rem;
+}
+
+.time-tracking-section {
+    margin-bottom: 2rem;
+}
+
+.time-tracking-section h5 {
+    margin-bottom: 1rem;
+    color: var(--dark-primary);
+}
+
+body.bright-theme .time-tracking-section h5 {
+    color: var(--bright-primary);
+}
+
+.time-tracking-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 0.5rem;
+}
+
+.time-tracking-table th,
+.time-tracking-table td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid var(--dark-border);
+}
+
+body.bright-theme .time-tracking-table th,
+body.bright-theme .time-tracking-table td {
+    border-bottom-color: var(--bright-border);
+}
+
+.time-tracking-table th {
+    background: var(--dark-secondary);
+    font-weight: 600;
+    color: var(--dark-text);
+}
+
+body.bright-theme .time-tracking-table th {
+    background: var(--bright-secondary);
+    color: var(--bright-text);
+}
+
+.time-tracking-table td {
+    background: var(--dark-bg);
+    color: var(--dark-text);
+}
+
+body.bright-theme .time-tracking-table td {
+    background: var(--bright-bg);
+    color: var(--bright-text);
+}
+
+.time-input {
+    width: 80px;
+    padding: 0.4rem;
+    border: 1px solid var(--dark-border);
+    border-radius: 4px;
+    background: var(--dark-bg);
+    color: var(--dark-text);
+    text-align: center;
+}
+
+body.bright-theme .time-input {
+    border-color: var(--bright-border);
+    background: var(--bright-bg);
+    color: var(--bright-text);
+}
+
+.time-input:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.time-tracking-table .over {
+    color: #ff6b6b;
+    font-weight: 600;
+}
+
+.time-tracking-table .under {
+    color: #51cf66;
+    font-weight: 600;
+}
+
+.time-tracking-table .ontarget {
+    color: #4dabf7;
+    font-weight: 600;
+}

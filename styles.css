@@ -1656,6 +1656,14 @@ body.bright-theme .time-tracking-table td {
     background: var(--dark-bg);
     color: var(--dark-text);
     text-align: center;
+    -moz-appearance: textfield;
+}
+
+/* Remove spinner buttons from number inputs */
+.time-input::-webkit-inner-spin-button,
+.time-input::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
 }
 
 body.bright-theme .time-input {
@@ -1684,11 +1692,12 @@ body.bright-theme .time-input {
     font-weight: 600;
 }
 
-/* Time Tracking in Settings */
+/* Time Tracking in Sidebar */
 .time-tracking-content {
-    max-height: 500px;
+    flex: 1;
     overflow-y: auto;
     margin-top: 1rem;
+    min-height: 0;
 }
 
 /* Fix week input calendar icon color */
@@ -1836,6 +1845,14 @@ body.bright-theme .client-input-section label {
     background: var(--dark-bg);
     color: var(--dark-text);
     text-align: center;
+    -moz-appearance: textfield;
+}
+
+/* Remove spinner buttons from number inputs (duplicate for specificity) */
+.time-input::-webkit-inner-spin-button,
+.time-input::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
 }
 
 body.bright-theme .time-input {

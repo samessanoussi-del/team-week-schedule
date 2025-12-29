@@ -23,6 +23,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderSettings();
     updateStats();
     setupRealtimeSubscriptions();
+    renderTimeTracking();
     console.log('✅ App initialized');
 });
 

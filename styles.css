@@ -781,15 +781,11 @@ body.bright-theme .day-header.today {
 }
 
 .day-column.today {
-    background: rgba(255, 193, 7, 0.05);
-    border-left: 3px solid #ffc107;
-    border-right: 3px solid #ffc107;
+    /* No vertical lines, just keep the header highlight */
 }
 
 body.bright-theme .day-column.today {
-    background: rgba(255, 193, 7, 0.08);
-    border-left-color: #ffc107;
-    border-right-color: #ffc107;
+    /* No vertical lines, just keep the header highlight */
 }
 
 .time-block {

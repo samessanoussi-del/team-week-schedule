@@ -781,11 +781,11 @@ body.bright-theme .day-header.today {
 }
 
 .day-column.today {
-    /* No vertical lines, just keep the header highlight */
+    /* No styling - only header is highlighted */
 }
 
 body.bright-theme .day-column.today {
-    /* No vertical lines, just keep the header highlight */
+    /* No styling - only header is highlighted */
 }
 
 .time-block {

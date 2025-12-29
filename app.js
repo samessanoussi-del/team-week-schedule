@@ -35,52 +35,68 @@ let realtimeChannels = {
 function setupRealtimeSubscriptions() {
     // Check if supabase is available
     if (typeof supabase === 'undefined') {
-        console.warn('Supabase not available, real-time subscriptions disabled');
+        console.warn('⚠️ Supabase not available, real-time subscriptions disabled');
         return;
     }
+    
+    console.log('🔔 Setting up real-time subscriptions...');
     
     // Subscribe to team_members changes
     realtimeChannels.teamMembers = supabase
         .channel('team_members_changes')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'team_members' }, async () => {
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'team_members' }, async (payload) => {
+            console.log('📢 Real-time update: team_members changed', payload);
             await loadTeamMembers();
             renderSidebar();
             renderSettings();
             renderCalendar();
             updateStats();
         })
-        .subscribe();
+        .subscribe((status) => {
+            console.log('Team members subscription status:', status);
+        });
 
     // Subscribe to clients changes
     realtimeChannels.clients = supabase
         .channel('clients_changes')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'clients' }, async () => {
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'clients' }, async (payload) => {
+            console.log('📢 Real-time update: clients changed', payload);
             await loadClients();
             renderSidebar();
             renderSettings();
             renderCalendar();
             updateStats();
         })
-        .subscribe();
+        .subscribe((status) => {
+            console.log('Clients subscription status:', status);
+        });
 
     // Subscribe to schedule changes
     realtimeChannels.schedule = supabase
         .channel('schedule_changes')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'schedule' }, async () => {
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'schedule' }, async (payload) => {
+            console.log('📢 Real-time update: schedule changed', payload);
             await loadSchedule();
             renderCalendar();
             updateStats();
         })
-        .subscribe();
+        .subscribe((status) => {
+            console.log('Schedule subscription status:', status);
+        });
 
     // Subscribe to app_settings changes
     realtimeChannels.appSettings = supabase
         .channel('app_settings_changes')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' }, async () => {
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' }, async (payload) => {
+            console.log('📢 Real-time update: app_settings changed', payload);
             await loadAppSettings();
             renderCalendar();
         })
-        .subscribe();
+        .subscribe((status) => {
+            console.log('App settings subscription status:', status);
+        });
+    
+    console.log('✅ Real-time subscriptions set up');
 }
 
 // Load team members from Supabase
@@ -107,7 +123,12 @@ async function loadTeamMembers() {
             .select('*')
             .order('name');
 
-        if (error) throw error;
+        if (error) {
+            console.error('Supabase error loading team members:', error);
+            throw error;
+        }
+
+        console.log('Team members from Supabase:', data?.length || 0, data);
 
         if (data && data.length > 0) {
             teamMembers = data.map(m => ({
@@ -117,6 +138,7 @@ async function loadTeamMembers() {
             }));
         } else {
             // Default data if empty
+            console.log('No team members found, creating defaults...');
             teamMembers = [
                 { name: 'John Doe', color: '#ce2828', profilePicture: '' },
                 { name: 'Jane Smith', color: '#4a90e2', profilePicture: '' },
@@ -166,7 +188,12 @@ async function loadClients() {
             .select('*')
             .order('name');
 
-        if (error) throw error;
+        if (error) {
+            console.error('Supabase error loading clients:', error);
+            throw error;
+        }
+
+        console.log('Clients from Supabase:', data?.length || 0, data);
 
         if (data && data.length > 0) {
             clients = data.map(c => ({
@@ -175,6 +202,7 @@ async function loadClients() {
             }));
         } else {
             // Default data if empty
+            console.log('No clients found, creating defaults...');
             clients = [
                 { name: 'Client A', color: '#667eea' },
                 { name: 'Client B', color: '#764ba2' },
@@ -356,10 +384,20 @@ async function loadAppSettings() {
 
 // Load data from Supabase (with localStorage fallback)
 async function loadData() {
+    console.log('📥 Loading data from Supabase...');
+    console.log('Supabase available:', typeof supabase !== 'undefined');
+    
     await loadTeamMembers();
+    console.log('Loaded team members:', teamMembers.length);
+    
     await loadClients();
+    console.log('Loaded clients:', clients.length);
+    
     await loadSchedule();
+    console.log('Loaded schedule entries:', Object.keys(schedule).length);
+    
     await loadAppSettings();
+    console.log('Loaded time blocks:', timeBlocks.length);
 
     // Load admin mode state - persists across browser sessions per device (localStorage only)
     const savedAdminMode = localStorage.getItem('isAdminMode');
@@ -373,6 +411,8 @@ async function loadData() {
     updateModeIndicator();
     applyViewModeRestrictions();
     applyAdminModeClass();
+    
+    console.log('✅ Data loading complete');
 }
 
 // Save state to history for undo
@@ -421,7 +461,11 @@ async function saveTeamMembers() {
     
     try {
         // Get all existing members first
-        const { data: existing } = await supabase.from('team_members').select('id');
+        const { data: existing, error: selectError } = await supabase.from('team_members').select('id');
+        if (selectError) {
+            console.error('Error selecting existing team members:', selectError);
+            throw selectError;
+        }
         
         // Delete all existing members if any
         if (existing && existing.length > 0) {
@@ -430,7 +474,11 @@ async function saveTeamMembers() {
                 .from('team_members')
                 .delete()
                 .in('id', idsToDelete);
-            if (deleteError) throw deleteError;
+            if (deleteError) {
+                console.error('Error deleting team members:', deleteError);
+                throw deleteError;
+            }
+            console.log('Deleted', existing.length, 'existing team members');
         }
         
         // Insert all current members
@@ -445,7 +493,11 @@ async function saveTeamMembers() {
                 .from('team_members')
                 .insert(membersToInsert);
             
-            if (error) throw error;
+            if (error) {
+                console.error('Error inserting team members:', error);
+                throw error;
+            }
+            console.log('✅ Saved', teamMembers.length, 'team members to Supabase');
         }
     } catch (error) {
         console.error('Error saving team members:', error);
@@ -566,10 +618,21 @@ async function saveAppSettings() {
 
 // Save data to Supabase (with localStorage fallback)
 async function saveData() {
-    await saveTeamMembers();
-    await saveClients();
-    await saveSchedule();
-    await saveAppSettings();
+    console.log('💾 Saving data to Supabase...', {
+        teamMembers: teamMembers.length,
+        clients: clients.length,
+        scheduleKeys: Object.keys(schedule).length
+    });
+    
+    try {
+        await saveTeamMembers();
+        await saveClients();
+        await saveSchedule();
+        await saveAppSettings();
+        console.log('✅ Data saved successfully to Supabase');
+    } catch (error) {
+        console.error('❌ Error saving data:', error);
+    }
     
     // Admin mode stays in localStorage (per device)
     localStorage.setItem('isAdminMode', isAdminMode);

@@ -1062,6 +1062,7 @@ body.bright-theme .close-btn:hover {
     gap: 2rem;
     align-items: start;
     min-height: 0;
+    height: fit-content;
 }
 
 .settings-left-column {
@@ -1073,13 +1074,12 @@ body.bright-theme .close-btn:hover {
 }
 
 .settings-right-column {
-    display: grid;
-    grid-template-rows: 1fr;
+    display: flex;
+    flex-direction: column;
     min-height: 0;
     max-height: 100%;
     align-content: start;
     overflow: hidden;
-    height: fit-content;
 }
 
 .settings-section {

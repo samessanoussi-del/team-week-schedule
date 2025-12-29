@@ -81,3 +81,4 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...';
 - All other data syncs in real-time across all devices
 - First load might be slow as it migrates from localStorage to Supabase
 
+

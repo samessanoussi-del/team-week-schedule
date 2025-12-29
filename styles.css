@@ -1050,7 +1050,8 @@ body.bright-theme .close-btn:hover {
 .settings-layout {
     display: flex;
     gap: 2rem;
-    align-items: flex-start;
+    align-items: stretch;
+    min-height: 0;
 }
 
 .settings-left-column {
@@ -1063,10 +1064,20 @@ body.bright-theme .close-btn:hover {
     flex: 1;
     display: flex;
     flex-direction: column;
+    min-height: 0;
 }
 
 .settings-section {
     margin-bottom: 2rem;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.settings-section:last-child {
+    margin-bottom: 0;
+    flex: 1;
+    min-height: 0;
 }
 
 .settings-section h3 {
@@ -1685,12 +1696,7 @@ body.bright-theme .time-input {
     font-weight: 600;
 }
 
-/* Time Tracking in Settings */
-.time-tracking-content {
-    max-height: 500px;
-    overflow-y: auto;
-    margin-top: 1rem;
-}
+/* Time Tracking in Settings - First definition removed, using the one below */
 
 /* Fix week input calendar icon color */
 .week-input,
@@ -1724,6 +1730,8 @@ body.bright-theme input[type="week"]::-webkit-calendar-picker-indicator {
     flex: 1;
     overflow-y: auto;
     padding: 1rem;
+    min-height: 0;
+    margin-top: 1rem;
 }
 
 .time-tracking-members {

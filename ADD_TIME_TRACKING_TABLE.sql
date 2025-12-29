@@ -23,3 +23,4 @@ CREATE POLICY "Allow all operations on weekly_time_tracking" ON weekly_time_trac
 -- Create index for better performance
 CREATE INDEX IF NOT EXISTS idx_weekly_time_tracking_week_key ON weekly_time_tracking(week_key);
 
+

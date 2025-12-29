@@ -1722,12 +1722,13 @@ function renderTimeTracking() {
             return;
         }
         
+        const memberHeaderTextColor = getContrastTextColor(memberColor);
         html += `<div class="time-tracking-member-panel">
-            <div class="member-panel-header" style="background-color: ${memberColor}">
-                <h4>${member.name}</h4>
+            <div class="member-panel-header" style="background-color: ${memberColor}; color: ${memberHeaderTextColor};">
+                <h4 style="color: ${memberHeaderTextColor};">${member.name}</h4>
                 <div class="member-totals">
-                    <span>Total Assigned: ${totalAssigned.toFixed(1)}h</span>
-                    <span>Total Toggl: ${totalActual.toFixed(1)}h</span>
+                    <span style="color: ${memberHeaderTextColor};">Total Assigned: ${totalAssigned.toFixed(1)}h</span>
+                    <span style="color: ${memberHeaderTextColor};">Total Toggl: ${totalActual.toFixed(1)}h</span>
                 </div>
             </div>
             <div class="member-clients-list">`;

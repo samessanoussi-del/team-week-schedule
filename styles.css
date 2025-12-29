@@ -871,19 +871,20 @@ body.bright-theme .time-block.work-block.highlight-clear {
     align-items: center;
     gap: 0;
     flex-shrink: 0;
-    border-radius: 50px 0 0 50px;
+    border-radius: 50px;
 }
 
 .assignment-member-circle {
-    width: 50px;
-    height: 50px;
-    min-width: 50px;
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
     overflow: hidden;
+    margin: 5px;
 }
 
 .assignment-profile-picture {
@@ -924,7 +925,7 @@ body.bright-theme .time-block.work-block.highlight-clear {
     justify-content: space-between;
     padding: 0.5rem 1rem;
     position: relative;
-    border-radius: 0 50px 50px 0;
+    border-radius: 50px;
 }
 
 .assignment-client-name {
@@ -941,7 +942,7 @@ body.bright-theme .time-block.work-block.highlight-clear {
     width: 20px;
     height: 20px;
     cursor: pointer;
-    font-size: 0.75rem;
+    font-size: 1rem;
     color: #dc3545;
     display: flex;
     align-items: center;
@@ -950,6 +951,8 @@ body.bright-theme .time-block.work-block.highlight-clear {
     transition: opacity 0.2s;
     flex-shrink: 0;
     margin-left: 0.5rem;
+    font-weight: 700;
+    line-height: 1;
 }
 
 .assignment-client-box:hover .assignment-remove {

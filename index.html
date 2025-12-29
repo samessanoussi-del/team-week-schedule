@@ -69,6 +69,20 @@
             </main>
         </div>
         
+        <!-- Time Tracking Sidebar -->
+        <aside class="time-tracking-sidebar">
+            <div class="time-tracking-header">
+                <h3>Weekly Time Tracking</h3>
+                <div class="time-tracking-controls">
+                    <label for="timeTrackingWeek">Week:</label>
+                    <input type="week" id="timeTrackingWeek" class="input-field week-input">
+                </div>
+            </div>
+            <div id="timeTrackingContent" class="time-tracking-content">
+                <!-- Time tracking will be populated here -->
+            </div>
+        </aside>
+        
         <!-- Stats Panel -->
         <div class="stats-panel">
             <h3>Statistics</h3>
@@ -114,17 +128,6 @@
                     </div>
                     <div id="clientsSettingsList" class="settings-list">
                         <!-- Clients list will be populated here -->
-                    </div>
-                </div>
-                <div class="settings-section">
-                    <h3>Weekly Time Tracking</h3>
-                    <div class="time-tracking-controls">
-                        <label for="timeTrackingWeek">Select Week:</label>
-                        <input type="week" id="timeTrackingWeek" class="input-field">
-                        <button id="loadTimeTrackingBtn" class="btn-primary">Load Week</button>
-                    </div>
-                    <div id="timeTrackingContent">
-                        <!-- Time tracking will be populated here -->
                     </div>
                 </div>
             </div>

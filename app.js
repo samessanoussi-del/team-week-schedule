@@ -1569,7 +1569,7 @@ function renderTimeTracking() {
     
     const selectedWeek = weekInput ? weekInput.value : null;
     if (!selectedWeek) {
-        timeTrackingContent.innerHTML = '<p>Please select a week to view time tracking.</p>';
+        timeTrackingContent.innerHTML = '<p style="padding: 1rem; color: var(--dark-text);">Please select a week to view time tracking.</p>';
         return;
     }
     
@@ -1587,72 +1587,95 @@ function renderTimeTracking() {
     const weekKey = getWeekKey(weekStart);
     const actualHours = weeklyTimeTracking[weekKey] || {};
     
-    // Build summary
-    let html = '<div class="time-tracking-summary">';
-    html += '<h4>Weekly Time Summary</h4>';
-    
-    // Summary by member
-    html += '<div class="time-tracking-section"><h5>By Member</h5><table class="time-tracking-table">';
-    html += '<thead><tr><th>Member</th><th>Client</th><th>Assigned</th><th>Actual</th><th>Difference</th><th>Status</th></tr></thead><tbody>';
+    // Build member panels
+    let html = '<div class="time-tracking-members">';
     
     teamMembers.forEach(member => {
         const memberAssigned = assignedHours[member.name] || {};
         const memberActual = actualHours[member.name] || {};
+        const memberColor = member.color || '#ce2828';
         
+        // Calculate total assigned and actual for this member
+        let totalAssigned = 0;
+        let totalActual = 0;
+        Object.keys(memberAssigned).forEach(clientName => {
+            totalAssigned += memberAssigned[clientName];
+            totalActual += memberActual[clientName] || 0;
+        });
+        
+        // Only show members who have assignments or actual hours
+        if (Object.keys(memberAssigned).length === 0 && totalActual === 0) {
+            return;
+        }
+        
+        html += `<div class="time-tracking-member-panel">
+            <div class="member-panel-header" style="background-color: ${memberColor}">
+                <h4>${member.name}</h4>
+                <div class="member-totals">
+                    <span>Assigned: ${totalAssigned.toFixed(1)}h</span>
+                    <span>Actual: ${totalActual.toFixed(1)}h</span>
+                </div>
+            </div>
+            <div class="member-clients-list">`;
+        
+        // Show each client this member worked on
         Object.keys(memberAssigned).forEach(clientName => {
             const assigned = memberAssigned[clientName];
             const actual = memberActual[clientName] || 0;
             const diff = actual - assigned;
-            const status = diff > 0 ? '⚠️ Over' : diff < 0 ? '✅ Under' : '✓ On Target';
             const statusClass = diff > 0 ? 'over' : diff < 0 ? 'under' : 'ontarget';
+            const client = clients.find(c => c.name === clientName);
+            const clientColor = client ? client.color : '#667eea';
             
-            html += `<tr>
-                <td>${member.name}</td>
-                <td>${clientName}</td>
-                <td>${assigned.toFixed(1)}h</td>
-                <td><input type="number" step="0.1" min="0" value="${actual}" 
-                    onchange="updateTimeTracking('${weekKey}', '${member.name}', '${clientName}', this.value)" 
-                    class="time-input" ${isAdminMode ? '' : 'disabled'}></td>
-                <td class="${statusClass}">${diff > 0 ? '+' : ''}${diff.toFixed(1)}h</td>
-                <td class="${statusClass}">${status}</td>
-            </tr>`;
-        });
-    });
-    
-    html += '</tbody></table></div>';
-    
-    // Summary by client
-    html += '<div class="time-tracking-section"><h5>By Client</h5><table class="time-tracking-table">';
-    html += '<thead><tr><th>Client</th><th>Total Assigned</th><th>Total Actual</th><th>Difference</th><th>Status</th></tr></thead><tbody>';
-    
-    clients.forEach(client => {
-        let totalAssigned = 0;
-        let totalActual = 0;
-        
-        teamMembers.forEach(member => {
-            const memberAssigned = assignedHours[member.name] || {};
-            const memberActual = actualHours[member.name] || {};
-            totalAssigned += memberAssigned[client.name] || 0;
-            totalActual += memberActual[client.name] || 0;
+            html += `<div class="member-client-item">
+                <div class="client-info">
+                    <div class="client-color-indicator" style="background-color: ${clientColor}"></div>
+                    <span class="client-name">${clientName}</span>
+                    <span class="assigned-hours">${assigned.toFixed(1)}h assigned</span>
+                </div>
+                <div class="client-input-section">
+                    <label>Actual:</label>
+                    <input type="number" step="0.1" min="0" value="${actual}" 
+                        onchange="updateTimeTracking('${weekKey}', '${member.name}', '${clientName}', this.value)" 
+                        class="time-input" ${isAdminMode ? '' : 'disabled'}>
+                    <span class="hours-label">h</span>
+                    ${diff !== 0 ? `<span class="diff-badge ${statusClass}">${diff > 0 ? '+' : ''}${diff.toFixed(1)}h</span>` : ''}
+                </div>
+            </div>`;
         });
         
-        if (totalAssigned > 0 || totalActual > 0) {
-            const diff = totalActual - totalAssigned;
-            const status = diff > 0 ? '⚠️ Over' : diff < 0 ? '✅ Under' : '✓ On Target';
-            const statusClass = diff > 0 ? 'over' : diff < 0 ? 'under' : 'ontarget';
-            
-            html += `<tr>
-                <td>${client.name}</td>
-                <td>${totalAssigned.toFixed(1)}h</td>
-                <td>${totalActual.toFixed(1)}h</td>
-                <td class="${statusClass}">${diff > 0 ? '+' : ''}${diff.toFixed(1)}h</td>
-                <td class="${statusClass}">${status}</td>
-            </tr>`;
-        }
+        // Also show clients with actual hours but no assignments
+        Object.keys(memberActual).forEach(clientName => {
+            if (!memberAssigned[clientName] && memberActual[clientName] > 0) {
+                const actual = memberActual[clientName];
+                const client = clients.find(c => c.name === clientName);
+                const clientColor = client ? client.color : '#667eea';
+                
+                html += `<div class="member-client-item">
+                    <div class="client-info">
+                        <div class="client-color-indicator" style="background-color: ${clientColor}"></div>
+                        <span class="client-name">${clientName}</span>
+                        <span class="assigned-hours">0h assigned</span>
+                    </div>
+                    <div class="client-input-section">
+                        <label>Actual:</label>
+                        <input type="number" step="0.1" min="0" value="${actual}" 
+                            onchange="updateTimeTracking('${weekKey}', '${member.name}', '${clientName}', this.value)" 
+                            class="time-input" ${isAdminMode ? '' : 'disabled'}>
+                        <span class="hours-label">h</span>
+                    </div>
+                </div>`;
+            }
+        });
+        
+        html += `</div></div>`;
     });
     
-    html += '</tbody></table></div></div>';
+    if (html === '<div class="time-tracking-members">') {
+        html += '<p style="padding: 1rem; color: var(--dark-text);">No time tracking data for this week.</p>';
+    }
     
+    html += '</div>';
     timeTrackingContent.innerHTML = html;
 }
 
@@ -1863,13 +1886,7 @@ function setupEventListeners() {
     });
     
     // Time tracking week selector
-    const loadTimeTrackingBtn = document.getElementById('loadTimeTrackingBtn');
     const timeTrackingWeek = document.getElementById('timeTrackingWeek');
-    if (loadTimeTrackingBtn) {
-        loadTimeTrackingBtn.addEventListener('click', () => {
-            renderTimeTracking();
-        });
-    }
     if (timeTrackingWeek) {
         timeTrackingWeek.addEventListener('change', () => {
             renderTimeTracking();

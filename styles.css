@@ -1634,3 +1634,250 @@ body.bright-theme .time-input {
     color: #4dabf7;
     font-weight: 600;
 }
+
+/* Time Tracking Sidebar */
+.time-tracking-sidebar {
+    position: fixed;
+    right: 0;
+    top: 80px;
+    width: 350px;
+    height: calc(100vh - 80px);
+    background: var(--dark-secondary);
+    border-left: 2px solid var(--dark-border);
+    display: flex;
+    flex-direction: column;
+    z-index: 100;
+    overflow-y: auto;
+}
+
+body.bright-theme .time-tracking-sidebar {
+    background: var(--bright-secondary);
+    border-left-color: var(--bright-border);
+}
+
+.time-tracking-header {
+    padding: 1rem;
+    border-bottom: 2px solid var(--dark-border);
+    background: var(--dark-bg);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+body.bright-theme .time-tracking-header {
+    border-bottom-color: var(--bright-border);
+    background: var(--bright-bg);
+}
+
+.time-tracking-header h3 {
+    margin: 0 0 1rem 0;
+    color: var(--dark-primary);
+}
+
+body.bright-theme .time-tracking-header h3 {
+    color: var(--bright-primary);
+}
+
+.time-tracking-controls {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.time-tracking-controls label {
+    font-weight: 500;
+    color: var(--dark-text);
+}
+
+body.bright-theme .time-tracking-controls label {
+    color: var(--bright-text);
+}
+
+/* Fix week input calendar icon color */
+.week-input,
+input[type="week"] {
+    padding: 0.5rem;
+    border: 1px solid var(--dark-border);
+    border-radius: 4px;
+    background: var(--dark-bg);
+    color: var(--dark-text);
+    flex: 1;
+}
+
+body.bright-theme .week-input,
+body.bright-theme input[type="week"] {
+    border-color: var(--bright-border);
+    background: var(--bright-bg);
+    color: var(--bright-text);
+}
+
+/* Make calendar icon white/visible */
+input[type="week"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+    cursor: pointer;
+}
+
+body.bright-theme input[type="week"]::-webkit-calendar-picker-indicator {
+    filter: invert(0);
+}
+
+.time-tracking-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1rem;
+}
+
+.time-tracking-members {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.time-tracking-member-panel {
+    background: var(--dark-bg);
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--dark-border);
+}
+
+body.bright-theme .time-tracking-member-panel {
+    background: var(--bright-bg);
+    border-color: var(--bright-border);
+}
+
+.member-panel-header {
+    padding: 1rem;
+    color: white;
+}
+
+.member-panel-header h4 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.1rem;
+}
+
+.member-totals {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.9rem;
+    opacity: 0.9;
+}
+
+.member-clients-list {
+    padding: 0.75rem;
+}
+
+.member-client-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    background: var(--dark-secondary);
+    border-radius: 6px;
+    border: 1px solid var(--dark-border);
+}
+
+body.bright-theme .member-client-item {
+    background: var(--bright-secondary);
+    border-color: var(--bright-border);
+}
+
+.client-info {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex: 1;
+}
+
+.client-color-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.client-name {
+    font-weight: 500;
+    color: var(--dark-text);
+}
+
+body.bright-theme .client-name {
+    color: var(--bright-text);
+}
+
+.assigned-hours {
+    font-size: 0.85rem;
+    color: var(--dark-text);
+    opacity: 0.7;
+}
+
+body.bright-theme .assigned-hours {
+    color: var(--bright-text);
+}
+
+.client-input-section {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.client-input-section label {
+    font-size: 0.9rem;
+    color: var(--dark-text);
+}
+
+body.bright-theme .client-input-section label {
+    color: var(--bright-text);
+}
+
+.time-input {
+    width: 70px;
+    padding: 0.4rem;
+    border: 1px solid var(--dark-border);
+    border-radius: 4px;
+    background: var(--dark-bg);
+    color: var(--dark-text);
+    text-align: center;
+}
+
+body.bright-theme .time-input {
+    border-color: var(--bright-border);
+    background: var(--bright-bg);
+    color: var(--bright-text);
+}
+
+.hours-label {
+    font-size: 0.9rem;
+    color: var(--dark-text);
+}
+
+body.bright-theme .hours-label {
+    color: var(--bright-text);
+}
+
+.diff-badge {
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.diff-badge.over {
+    background: rgba(255, 107, 107, 0.2);
+    color: #ff6b6b;
+}
+
+.diff-badge.under {
+    background: rgba(81, 207, 102, 0.2);
+    color: #51cf66;
+}
+
+.diff-badge.ontarget {
+    background: rgba(77, 171, 247, 0.2);
+    color: #4dabf7;
+}
+
+/* Adjust main content to account for sidebar */
+.main-content {
+    margin-right: 350px;
+}

@@ -1560,34 +1560,27 @@ function renderTimeTracking() {
     const timeTrackingContent = document.getElementById('timeTrackingContent');
     if (!timeTrackingContent) return;
     
-    // Set default week to current week
-    const weekInput = document.getElementById('timeTrackingWeek');
-    if (weekInput && !weekInput.value) {
-        const year = currentWeekStart.getFullYear();
-        const week = getWeekNumber(currentWeekStart);
-        weekInput.value = `${year}-W${String(week).padStart(2, '0')}`;
-    }
-    
-    const selectedWeek = weekInput ? weekInput.value : null;
-    if (!selectedWeek) {
-        timeTrackingContent.innerHTML = '<p style="padding: 1rem; color: var(--dark-text);">Please select a week to view time tracking.</p>';
-        return;
-    }
-    
-    // Parse week string (YYYY-Www)
-    const [year, weekStr] = selectedWeek.split('-W');
-    const week = parseInt(weekStr);
-    
-    // Calculate week start date (Monday of that week)
-    const jan4 = new Date(year, 0, 4);
-    const jan4Day = jan4.getDay() || 7;
-    const weekStart = new Date(jan4);
-    weekStart.setDate(jan4.getDate() - jan4Day + 1 + (week - 1) * 7);
+    // Use currentWeekStart from the calendar (sync with home page)
+    const weekStart = new Date(currentWeekStart);
+    weekStart.setHours(0, 0, 0, 0);
     
     // Calculate assigned hours from schedule
     const assignedHours = calculateAssignedHours(weekStart);
     const weekKey = getWeekKey(weekStart);
     const actualHours = weeklyTimeTracking[weekKey] || {};
+    
+    // Update the week display to match current week
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 4); // Monday to Friday
+    const options = { month: 'short', day: 'numeric', year: 'numeric' };
+    const startStr = weekStart.toLocaleDateString('en-US', options);
+    const endStr = weekEnd.toLocaleDateString('en-US', options);
+    
+    // Update week display in time tracking
+    const weekDisplay = document.getElementById('timeTrackingWeekDisplay');
+    if (weekDisplay) {
+        weekDisplay.textContent = `${startStr} - ${endStr} (EST)`;
+    }
     
     // Build member panels - show ALL members who have assignments
     let html = '<div class="time-tracking-members">';
@@ -1908,10 +1901,28 @@ function setupEventListeners() {
         }
     });
     
-    // Time tracking week selector
-    const timeTrackingWeek = document.getElementById('timeTrackingWeek');
-    if (timeTrackingWeek) {
-        timeTrackingWeek.addEventListener('change', () => {
+    // Time tracking week navigation
+    const timeTrackingPrevWeek = document.getElementById('timeTrackingPrevWeek');
+    const timeTrackingNextWeek = document.getElementById('timeTrackingNextWeek');
+    
+    if (timeTrackingPrevWeek) {
+        timeTrackingPrevWeek.addEventListener('click', () => {
+            currentWeekStart.setDate(currentWeekStart.getDate() - 7);
+            saveData();
+            renderCalendar();
+            updateWeekDisplay();
+            updateStats();
+            renderTimeTracking();
+        });
+    }
+    
+    if (timeTrackingNextWeek) {
+        timeTrackingNextWeek.addEventListener('click', () => {
+            currentWeekStart.setDate(currentWeekStart.getDate() + 7);
+            saveData();
+            renderCalendar();
+            updateWeekDisplay();
+            updateStats();
             renderTimeTracking();
         });
     }

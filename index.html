@@ -119,8 +119,13 @@
                 <div class="settings-section">
                     <h3>Weekly Time Tracking</h3>
                     <div class="time-tracking-controls">
-                        <label for="timeTrackingWeek">Select Week:</label>
-                        <input type="week" id="timeTrackingWeek" class="input-field week-input">
+                        <div class="time-tracking-week-display" style="font-weight: 600; color: var(--dark-primary); padding: 0.5rem 0;">
+                            <span id="timeTrackingWeekDisplay" class="week-display"></span>
+                        </div>
+                        <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+                            <button id="timeTrackingPrevWeek" class="btn-nav" style="font-size: 0.9rem; padding: 0.5rem 1rem;">← Previous Week</button>
+                            <button id="timeTrackingNextWeek" class="btn-nav" style="font-size: 0.9rem; padding: 0.5rem 1rem;">Next Week →</button>
+                        </div>
                     </div>
                     <div id="timeTrackingContent" class="time-tracking-content">
                         <!-- Time tracking will be populated here -->

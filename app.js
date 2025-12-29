@@ -1578,19 +1578,34 @@ function renderTimeTracking() {
     const [year, weekStr] = selectedWeek.split('-W');
     const week = parseInt(weekStr);
     
-    // Calculate week start date
+    // Calculate week start date (Monday of that week)
     const jan4 = new Date(year, 0, 4);
     const jan4Day = jan4.getDay() || 7;
     const weekStart = new Date(jan4);
     weekStart.setDate(jan4.getDate() - jan4Day + 1 + (week - 1) * 7);
     
+    // Calculate assigned hours from schedule
     const assignedHours = calculateAssignedHours(weekStart);
     const weekKey = getWeekKey(weekStart);
     const actualHours = weeklyTimeTracking[weekKey] || {};
     
-    // Build member panels
+    // Build member panels - show ALL members who have assignments
     let html = '<div class="time-tracking-members">';
     
+    // Get all members who have assignments this week
+    const membersWithAssignments = new Set();
+    Object.keys(assignedHours).forEach(memberName => {
+        if (Object.keys(assignedHours[memberName]).length > 0) {
+            membersWithAssignments.add(memberName);
+        }
+    });
+    
+    // Also include members who have actual hours entered
+    Object.keys(actualHours).forEach(memberName => {
+        membersWithAssignments.add(memberName);
+    });
+    
+    // Show panels for all members (even if no assignments, so they can enter data)
     teamMembers.forEach(member => {
         const memberAssigned = assignedHours[member.name] || {};
         const memberActual = actualHours[member.name] || {};
@@ -1604,6 +1619,13 @@ function renderTimeTracking() {
             totalActual += memberActual[clientName] || 0;
         });
         
+        // Also count actual hours for clients not in assigned
+        Object.keys(memberActual).forEach(clientName => {
+            if (!memberAssigned[clientName]) {
+                totalActual += memberActual[clientName] || 0;
+            }
+        });
+        
         // Only show members who have assignments or actual hours
         if (Object.keys(memberAssigned).length === 0 && totalActual === 0) {
             return;
@@ -1613,13 +1635,13 @@ function renderTimeTracking() {
             <div class="member-panel-header" style="background-color: ${memberColor}">
                 <h4>${member.name}</h4>
                 <div class="member-totals">
-                    <span>Assigned: ${totalAssigned.toFixed(1)}h</span>
-                    <span>Actual: ${totalActual.toFixed(1)}h</span>
+                    <span>Total Assigned: ${totalAssigned.toFixed(1)}h</span>
+                    <span>Total Actual: ${totalActual.toFixed(1)}h</span>
                 </div>
             </div>
             <div class="member-clients-list">`;
         
-        // Show each client this member worked on
+        // Show each client this member worked on (from schedule)
         Object.keys(memberAssigned).forEach(clientName => {
             const assigned = memberAssigned[clientName];
             const actual = memberActual[clientName] || 0;
@@ -1645,7 +1667,7 @@ function renderTimeTracking() {
             </div>`;
         });
         
-        // Also show clients with actual hours but no assignments
+        // Also show clients with actual hours but no assignments (manually added)
         Object.keys(memberActual).forEach(clientName => {
             if (!memberAssigned[clientName] && memberActual[clientName] > 0) {
                 const actual = memberActual[clientName];
@@ -1673,7 +1695,7 @@ function renderTimeTracking() {
     });
     
     if (html === '<div class="time-tracking-members">') {
-        html += '<p style="padding: 1rem; color: var(--dark-text);">No time tracking data for this week.</p>';
+        html += '<p style="padding: 1rem; color: var(--dark-text);">No assignments found for this week. Assign tasks in the calendar first.</p>';
     }
     
     html += '</div>';

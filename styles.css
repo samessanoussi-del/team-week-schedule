@@ -1635,62 +1635,11 @@ body.bright-theme .time-input {
     font-weight: 600;
 }
 
-/* Time Tracking Sidebar */
-.time-tracking-sidebar {
-    position: fixed;
-    right: 0;
-    top: 80px;
-    width: 350px;
-    height: calc(100vh - 80px);
-    background: var(--dark-secondary);
-    border-left: 2px solid var(--dark-border);
-    display: flex;
-    flex-direction: column;
-    z-index: 100;
+/* Time Tracking in Settings */
+.time-tracking-content {
+    max-height: 500px;
     overflow-y: auto;
-}
-
-body.bright-theme .time-tracking-sidebar {
-    background: var(--bright-secondary);
-    border-left-color: var(--bright-border);
-}
-
-.time-tracking-header {
-    padding: 1rem;
-    border-bottom: 2px solid var(--dark-border);
-    background: var(--dark-bg);
-    position: sticky;
-    top: 0;
-    z-index: 10;
-}
-
-body.bright-theme .time-tracking-header {
-    border-bottom-color: var(--bright-border);
-    background: var(--bright-bg);
-}
-
-.time-tracking-header h3 {
-    margin: 0 0 1rem 0;
-    color: var(--dark-primary);
-}
-
-body.bright-theme .time-tracking-header h3 {
-    color: var(--bright-primary);
-}
-
-.time-tracking-controls {
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
-}
-
-.time-tracking-controls label {
-    font-weight: 500;
-    color: var(--dark-text);
-}
-
-body.bright-theme .time-tracking-controls label {
-    color: var(--bright-text);
+    margin-top: 1rem;
 }
 
 /* Fix week input calendar icon color */
@@ -1877,7 +1826,3 @@ body.bright-theme .hours-label {
     color: #4dabf7;
 }
 
-/* Adjust main content to account for sidebar */
-.main-content {
-    margin-right: 350px;
-}

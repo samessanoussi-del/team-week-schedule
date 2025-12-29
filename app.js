@@ -1500,6 +1500,13 @@ function renderSettings() {
     });
     
     // Render time tracking section
+    // Sync time tracking week with current calendar week when settings opens
+    if (typeof window.timeTrackingWeekStart === 'undefined') {
+        window.timeTrackingWeekStart = new Date(currentWeekStart);
+    } else {
+        // Update to current week when settings opens
+        window.timeTrackingWeekStart = new Date(currentWeekStart);
+    }
     renderTimeTracking();
 }
 
@@ -2325,10 +2332,8 @@ function updateStats() {
     const personHours = {};
     const clientHours = {};
     
-    // Each work block is 2 hours
-    const hoursPerBlock = 2;
+    // Calculate hours per block dynamically from timeBlocks
     const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-    const workBlocks = ['Work1', 'Work2', 'Work3'];
     
     // Initialize counters
     teamMembers.forEach(member => {
@@ -2339,19 +2344,36 @@ function updateStats() {
         clientHours[client.name] = 0;
     });
     
-    // Count hours from schedule
-    Object.keys(schedule).forEach(blockKey => {
-        const assignments = schedule[blockKey];
-        if (Array.isArray(assignments)) {
-            assignments.forEach(assignment => {
-                if (personHours.hasOwnProperty(assignment.member)) {
-                    personHours[assignment.member] += hoursPerBlock;
-                }
-                if (clientHours.hasOwnProperty(assignment.client)) {
-                    clientHours[assignment.client] += hoursPerBlock;
-                }
-            });
-        }
+    // Count hours from schedule - ONLY for the current week
+    days.forEach((day, dayIndex) => {
+        const dayDate = new Date(currentWeekStart);
+        dayDate.setDate(currentWeekStart.getDate() + dayIndex);
+        const dateKey = formatDateKey(dayDate, day);
+        
+        timeBlocks.forEach(block => {
+            if (block.isLunch) return;
+            
+            const blockKey = `${dateKey}-${block.id}`;
+            const assignments = schedule[blockKey] || [];
+            
+            // Calculate hours for this block
+            const startHour = parseInt(block.startTime.split(':')[0]);
+            const endHour = parseInt(block.endTime.split(':')[0]);
+            const blockHours = endHour - startHour;
+            
+            if (Array.isArray(assignments)) {
+                assignments.forEach(assignment => {
+                    if (!assignment || !assignment.member || !assignment.client) return;
+                    
+                    if (personHours.hasOwnProperty(assignment.member)) {
+                        personHours[assignment.member] += blockHours;
+                    }
+                    if (clientHours.hasOwnProperty(assignment.client)) {
+                        clientHours[assignment.client] += blockHours;
+                    }
+                });
+            }
+        });
     });
     
     // Render person stats

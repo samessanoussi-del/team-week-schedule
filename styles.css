@@ -1671,12 +1671,11 @@ body.bright-theme .time-input {
     font-weight: 600;
 }
 
-/* Time Tracking in Sidebar */
+/* Time Tracking in Settings */
 .time-tracking-content {
-    flex: 1;
+    max-height: 500px;
     overflow-y: auto;
     margin-top: 1rem;
-    min-height: 0;
 }
 
 /* Fix week input calendar icon color */

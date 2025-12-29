@@ -1574,11 +1574,15 @@ function renderTimeTracking() {
     const timeTrackingContent = document.getElementById('timeTrackingContent');
     if (!timeTrackingContent) return;
     
-    // Use currentWeekStart from the calendar (sync with home page)
-    const weekStart = new Date(currentWeekStart);
+    // Use timeTrackingWeekStart (separate from calendar week, but syncs when settings opens)
+    // If timeTrackingWeekStart is not set, use currentWeekStart
+    if (typeof window.timeTrackingWeekStart === 'undefined') {
+        window.timeTrackingWeekStart = new Date(currentWeekStart);
+    }
+    const weekStart = new Date(window.timeTrackingWeekStart);
     weekStart.setHours(0, 0, 0, 0);
     
-    // Update the week display to match current week
+    // Update the week display
     const weekEnd = new Date(weekStart);
     weekEnd.setDate(weekStart.getDate() + 4); // Monday to Friday
     const options = { month: 'short', day: 'numeric', year: 'numeric' };
@@ -1922,29 +1926,37 @@ function setupEventListeners() {
         }
     });
     
-    // Time tracking week navigation
+    // Time tracking week navigation (uses separate week tracking for settings modal)
+    window.timeTrackingWeekStart = new Date(currentWeekStart);
+    
     const timeTrackingPrevWeek = document.getElementById('timeTrackingPrevWeek');
     const timeTrackingNextWeek = document.getElementById('timeTrackingNextWeek');
     
     if (timeTrackingPrevWeek) {
         timeTrackingPrevWeek.addEventListener('click', () => {
-            currentWeekStart.setDate(currentWeekStart.getDate() - 7);
-            saveData();
-            renderCalendar();
-            updateWeekDisplay();
-            updateStats();
+            window.timeTrackingWeekStart.setDate(window.timeTrackingWeekStart.getDate() - 7);
             renderTimeTracking();
         });
     }
     
     if (timeTrackingNextWeek) {
         timeTrackingNextWeek.addEventListener('click', () => {
-            currentWeekStart.setDate(currentWeekStart.getDate() + 7);
-            saveData();
-            renderCalendar();
-            updateWeekDisplay();
-            updateStats();
+            window.timeTrackingWeekStart.setDate(window.timeTrackingWeekStart.getDate() + 7);
             renderTimeTracking();
+        });
+    }
+    
+    // Sync time tracking week with main calendar when settings opens
+    const settingsBtn = document.getElementById('settingsBtn');
+    if (settingsBtn) {
+        // Get the existing click handler
+        const existingHandler = settingsBtn.onclick;
+        settingsBtn.addEventListener('click', () => {
+            if (isAdminMode) {
+                // Sync time tracking week with current calendar week
+                window.timeTrackingWeekStart = new Date(currentWeekStart);
+                // renderTimeTracking will be called by renderSettings
+            }
         });
     }
 }

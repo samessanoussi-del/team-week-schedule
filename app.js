@@ -7,6 +7,7 @@ let isDarkTheme = true; // Default to dark theme
 let timeBlocks = []; // Format: [{ id: 'Work1', label: 'Work Block 1', time: '11:00 AM - 1:00 PM', startTime: '11:00', endTime: '13:00', isLunch: false }, ...]
 let isAdminMode = false; // View mode by default
 const ADMIN_PASSWORD = 'Ravie2026';
+let weeklyTimeTracking = {}; // Format: { "2024-01-15": { "John": { "Client A": 5.5 }, ... }, ... }
 
 // Undo/Redo system
 let undoHistory = [];
@@ -439,6 +440,8 @@ async function loadData() {
     
     await loadAppSettings();
     console.log('Loaded time blocks:', timeBlocks.length);
+    
+    await loadWeeklyTimeTracking();
 
     // Load admin mode state - persists across browser sessions per device (localStorage only)
     const savedAdminMode = localStorage.getItem('isAdminMode');
@@ -632,6 +635,102 @@ async function saveSchedule() {
     }
 }
 
+// Load weekly time tracking from Supabase
+async function loadWeeklyTimeTracking() {
+    // Check if supabase is available
+    if (typeof supabase === 'undefined') {
+        const saved = localStorage.getItem('weeklyTimeTracking');
+        if (saved) {
+            weeklyTimeTracking = JSON.parse(saved);
+        } else {
+            weeklyTimeTracking = {};
+        }
+        return;
+    }
+    
+    try {
+        const { data, error } = await supabase
+            .from('weekly_time_tracking')
+            .select('*');
+
+        if (error) throw error;
+
+        weeklyTimeTracking = {};
+        if (data && data.length > 0) {
+            data.forEach(row => {
+                if (!weeklyTimeTracking[row.week_key]) {
+                    weeklyTimeTracking[row.week_key] = {};
+                }
+                if (!weeklyTimeTracking[row.week_key][row.member_name]) {
+                    weeklyTimeTracking[row.week_key][row.member_name] = {};
+                }
+                weeklyTimeTracking[row.week_key][row.member_name][row.client_name] = row.hours;
+            });
+        }
+    } catch (error) {
+        console.error('Error loading weekly time tracking:', error);
+        const saved = localStorage.getItem('weeklyTimeTracking');
+        if (saved) {
+            weeklyTimeTracking = JSON.parse(saved);
+        } else {
+            weeklyTimeTracking = {};
+        }
+    }
+}
+
+// Save weekly time tracking to Supabase
+async function saveWeeklyTimeTracking() {
+    // Check if supabase is available
+    if (typeof supabase === 'undefined') {
+        localStorage.setItem('weeklyTimeTracking', JSON.stringify(weeklyTimeTracking));
+        return;
+    }
+    
+    try {
+        // Get all existing entries first
+        const { data: existing } = await supabase.from('weekly_time_tracking').select('id, week_key, member_name, client_name');
+        
+        // Delete all existing entries if any
+        if (existing && existing.length > 0) {
+            const idsToDelete = existing.map(e => e.id);
+            const { error: deleteError } = await supabase
+                .from('weekly_time_tracking')
+                .delete()
+                .in('id', idsToDelete);
+            if (deleteError) throw deleteError;
+        }
+
+        // Insert all current entries
+        const entriesToInsert = [];
+        Object.keys(weeklyTimeTracking).forEach(weekKey => {
+            Object.keys(weeklyTimeTracking[weekKey]).forEach(memberName => {
+                Object.keys(weeklyTimeTracking[weekKey][memberName]).forEach(clientName => {
+                    const hours = weeklyTimeTracking[weekKey][memberName][clientName];
+                    if (hours && hours > 0) {
+                        entriesToInsert.push({
+                            week_key: weekKey,
+                            member_name: memberName,
+                            client_name: clientName,
+                            hours: hours
+                        });
+                    }
+                });
+            });
+        });
+
+        if (entriesToInsert.length > 0) {
+            const { error } = await supabase
+                .from('weekly_time_tracking')
+                .insert(entriesToInsert);
+            
+            if (error) throw error;
+        }
+    } catch (error) {
+        console.error('Error saving weekly time tracking:', error);
+        localStorage.setItem('weeklyTimeTracking', JSON.stringify(weeklyTimeTracking));
+    }
+}
+
 // Save app settings to Supabase
 async function saveAppSettings() {
     try {
@@ -671,6 +770,7 @@ async function saveData() {
         await saveClients();
         await saveSchedule();
         await saveAppSettings();
+        await saveWeeklyTimeTracking();
     } catch (error) {
         console.error('❌ Error saving data:', error);
     } finally {
@@ -813,6 +913,18 @@ function renderCalendar() {
                         </div>
                     `;
                     
+                    // Add click handler to edit client (only in admin mode)
+                    if (isAdminMode) {
+                        assignmentDiv.style.cursor = 'pointer';
+                        assignmentDiv.addEventListener('click', (e) => {
+                            // Don't trigger if clicking the remove button
+                            if (e.target.classList.contains('assignment-remove')) {
+                                return;
+                            }
+                            editAssignmentClient(blockKey, assignmentIndex, assignment);
+                        });
+                    }
+                    
                     // Add drag event listeners (only in admin mode)
                     if (isAdminMode) {
                         assignmentDiv.addEventListener('dragstart', (e) => {
@@ -828,6 +940,16 @@ function renderCalendar() {
                         assignmentDiv.addEventListener('dragend', () => {
                             assignmentDiv.classList.remove('dragging-assignment');
                             window.draggingAssignment = false;
+                        });
+                        
+                        // Add click handler to edit client (only in admin mode)
+                        assignmentDiv.style.cursor = 'pointer';
+                        assignmentDiv.addEventListener('click', (e) => {
+                            // Don't trigger if clicking the remove button
+                            if (e.target.classList.contains('assignment-remove')) {
+                                return;
+                            }
+                            editAssignmentClient(blockKey, assignmentIndex, assignment);
                         });
                     }
                     
@@ -1138,7 +1260,7 @@ function handleAssignmentDrop(e, blockKey) {
 }
 
 // Show client selection modal
-function showClientModal(memberName, blockKey) {
+function showClientModal(memberName, blockKey, assignmentIndex = null) {
     const modal = document.getElementById('clientModal');
     const clientList = document.getElementById('clientSelectionList');
     
@@ -1156,7 +1278,13 @@ function showClientModal(memberName, blockKey) {
                 <span>${client.name}</span>
             `;
             option.onclick = () => {
-                assignMemberToBlock(memberName, client.name, blockKey);
+                if (assignmentIndex !== null && window.editingAssignment) {
+                    // Editing existing assignment
+                    updateAssignmentClient(blockKey, assignmentIndex, client.name);
+                } else {
+                    // New assignment
+                    assignMemberToBlock(memberName, client.name, blockKey);
+                }
                 closeClientModal();
             };
             clientList.appendChild(option);
@@ -1166,6 +1294,20 @@ function showClientModal(memberName, blockKey) {
     modal.classList.add('show');
     window.currentBlockKey = blockKey;
     window.currentMemberName = memberName;
+}
+
+// Update assignment client
+function updateAssignmentClient(blockKey, assignmentIndex, newClientName) {
+    if (!isAdminMode) return;
+    
+    saveStateToHistory();
+    if (schedule[blockKey] && Array.isArray(schedule[blockKey]) && schedule[blockKey][assignmentIndex]) {
+        schedule[blockKey][assignmentIndex].client = newClientName;
+        saveData();
+        renderCalendar();
+        updateStats();
+    }
+    window.editingAssignment = null;
 }
 
 // Close client modal
@@ -1200,6 +1342,35 @@ function assignMemberToBlock(memberName, clientName, blockKey) {
     saveData();
     renderCalendar();
     updateStats();
+}
+
+// Edit assignment client
+function editAssignmentClient(blockKey, assignmentIndex, assignment) {
+    if (!isAdminMode) return;
+    
+    // Store the assignment info for editing
+    window.editingAssignment = {
+        blockKey: blockKey,
+        assignmentIndex: assignmentIndex,
+        member: assignment.member
+    };
+    
+    // Show client selection modal
+    showClientModal(assignment.member, blockKey, assignmentIndex);
+}
+
+// Update assignment client
+function updateAssignmentClient(blockKey, assignmentIndex, newClientName) {
+    if (!isAdminMode) return;
+    
+    saveStateToHistory();
+    if (schedule[blockKey] && Array.isArray(schedule[blockKey]) && schedule[blockKey][assignmentIndex]) {
+        schedule[blockKey][assignmentIndex].client = newClientName;
+        saveData();
+        renderCalendar();
+        updateStats();
+    }
+    window.editingAssignment = null;
 }
 
 // Remove assignment
@@ -1326,6 +1497,185 @@ function renderSettings() {
         `;
         clientsList.appendChild(item);
     });
+    
+    // Render time tracking section
+    renderTimeTracking();
+}
+
+// Calculate assigned hours for a week
+function calculateAssignedHours(weekStart) {
+    const assignedHours = {}; // { memberName: { clientName: hours } }
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+    
+    days.forEach((day, dayIndex) => {
+        const dayDate = new Date(weekStart);
+        dayDate.setDate(weekStart.getDate() + dayIndex);
+        const dateKey = formatDateKey(dayDate, day);
+        
+        timeBlocks.forEach(block => {
+            if (block.isLunch) return;
+            
+            const blockKey = `${dateKey}-${block.id}`;
+            const assignments = schedule[blockKey] || [];
+            
+            // Calculate hours for this block
+            const startHour = parseInt(block.startTime.split(':')[0]);
+            const endHour = parseInt(block.endTime.split(':')[0]);
+            const blockHours = endHour - startHour;
+            
+            assignments.forEach(assignment => {
+                if (!assignedHours[assignment.member]) {
+                    assignedHours[assignment.member] = {};
+                }
+                if (!assignedHours[assignment.member][assignment.client]) {
+                    assignedHours[assignment.member][assignment.client] = 0;
+                }
+                assignedHours[assignment.member][assignment.client] += blockHours;
+            });
+        });
+    });
+    
+    return assignedHours;
+}
+
+// Get week key from date
+function getWeekKey(date) {
+    const year = date.getFullYear();
+    const week = getWeekNumber(date);
+    return `${year}-W${String(week).padStart(2, '0')}`;
+}
+
+// Get week number from date
+function getWeekNumber(date) {
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+}
+
+// Render time tracking section
+function renderTimeTracking() {
+    const timeTrackingContent = document.getElementById('timeTrackingContent');
+    if (!timeTrackingContent) return;
+    
+    // Set default week to current week
+    const weekInput = document.getElementById('timeTrackingWeek');
+    if (weekInput && !weekInput.value) {
+        const year = currentWeekStart.getFullYear();
+        const week = getWeekNumber(currentWeekStart);
+        weekInput.value = `${year}-W${String(week).padStart(2, '0')}`;
+    }
+    
+    const selectedWeek = weekInput ? weekInput.value : null;
+    if (!selectedWeek) {
+        timeTrackingContent.innerHTML = '<p>Please select a week to view time tracking.</p>';
+        return;
+    }
+    
+    // Parse week string (YYYY-Www)
+    const [year, weekStr] = selectedWeek.split('-W');
+    const week = parseInt(weekStr);
+    
+    // Calculate week start date
+    const jan4 = new Date(year, 0, 4);
+    const jan4Day = jan4.getDay() || 7;
+    const weekStart = new Date(jan4);
+    weekStart.setDate(jan4.getDate() - jan4Day + 1 + (week - 1) * 7);
+    
+    const assignedHours = calculateAssignedHours(weekStart);
+    const weekKey = getWeekKey(weekStart);
+    const actualHours = weeklyTimeTracking[weekKey] || {};
+    
+    // Build summary
+    let html = '<div class="time-tracking-summary">';
+    html += '<h4>Weekly Time Summary</h4>';
+    
+    // Summary by member
+    html += '<div class="time-tracking-section"><h5>By Member</h5><table class="time-tracking-table">';
+    html += '<thead><tr><th>Member</th><th>Client</th><th>Assigned</th><th>Actual</th><th>Difference</th><th>Status</th></tr></thead><tbody>';
+    
+    teamMembers.forEach(member => {
+        const memberAssigned = assignedHours[member.name] || {};
+        const memberActual = actualHours[member.name] || {};
+        
+        Object.keys(memberAssigned).forEach(clientName => {
+            const assigned = memberAssigned[clientName];
+            const actual = memberActual[clientName] || 0;
+            const diff = actual - assigned;
+            const status = diff > 0 ? '⚠️ Over' : diff < 0 ? '✅ Under' : '✓ On Target';
+            const statusClass = diff > 0 ? 'over' : diff < 0 ? 'under' : 'ontarget';
+            
+            html += `<tr>
+                <td>${member.name}</td>
+                <td>${clientName}</td>
+                <td>${assigned.toFixed(1)}h</td>
+                <td><input type="number" step="0.1" min="0" value="${actual}" 
+                    onchange="updateTimeTracking('${weekKey}', '${member.name}', '${clientName}', this.value)" 
+                    class="time-input" ${isAdminMode ? '' : 'disabled'}></td>
+                <td class="${statusClass}">${diff > 0 ? '+' : ''}${diff.toFixed(1)}h</td>
+                <td class="${statusClass}">${status}</td>
+            </tr>`;
+        });
+    });
+    
+    html += '</tbody></table></div>';
+    
+    // Summary by client
+    html += '<div class="time-tracking-section"><h5>By Client</h5><table class="time-tracking-table">';
+    html += '<thead><tr><th>Client</th><th>Total Assigned</th><th>Total Actual</th><th>Difference</th><th>Status</th></tr></thead><tbody>';
+    
+    clients.forEach(client => {
+        let totalAssigned = 0;
+        let totalActual = 0;
+        
+        teamMembers.forEach(member => {
+            const memberAssigned = assignedHours[member.name] || {};
+            const memberActual = actualHours[member.name] || {};
+            totalAssigned += memberAssigned[client.name] || 0;
+            totalActual += memberActual[client.name] || 0;
+        });
+        
+        if (totalAssigned > 0 || totalActual > 0) {
+            const diff = totalActual - totalAssigned;
+            const status = diff > 0 ? '⚠️ Over' : diff < 0 ? '✅ Under' : '✓ On Target';
+            const statusClass = diff > 0 ? 'over' : diff < 0 ? 'under' : 'ontarget';
+            
+            html += `<tr>
+                <td>${client.name}</td>
+                <td>${totalAssigned.toFixed(1)}h</td>
+                <td>${totalActual.toFixed(1)}h</td>
+                <td class="${statusClass}">${diff > 0 ? '+' : ''}${diff.toFixed(1)}h</td>
+                <td class="${statusClass}">${status}</td>
+            </tr>`;
+        }
+    });
+    
+    html += '</tbody></table></div></div>';
+    
+    timeTrackingContent.innerHTML = html;
+}
+
+// Update time tracking
+function updateTimeTracking(weekKey, memberName, clientName, hours) {
+    if (!isAdminMode) return;
+    
+    if (!weeklyTimeTracking[weekKey]) {
+        weeklyTimeTracking[weekKey] = {};
+    }
+    if (!weeklyTimeTracking[weekKey][memberName]) {
+        weeklyTimeTracking[weekKey][memberName] = {};
+    }
+    
+    const hoursNum = parseFloat(hours) || 0;
+    if (hoursNum > 0) {
+        weeklyTimeTracking[weekKey][memberName][clientName] = hoursNum;
+    } else {
+        delete weeklyTimeTracking[weekKey][memberName][clientName];
+    }
+    
+    saveData();
+    renderTimeTracking();
 }
 
 // Setup event listeners
@@ -1511,6 +1861,20 @@ function setupEventListeners() {
             document.getElementById('addClientBtn').click();
         }
     });
+    
+    // Time tracking week selector
+    const loadTimeTrackingBtn = document.getElementById('loadTimeTrackingBtn');
+    const timeTrackingWeek = document.getElementById('timeTrackingWeek');
+    if (loadTimeTrackingBtn) {
+        loadTimeTrackingBtn.addEventListener('click', () => {
+            renderTimeTracking();
+        });
+    }
+    if (timeTrackingWeek) {
+        timeTrackingWeek.addEventListener('change', () => {
+            renderTimeTracking();
+        });
+    }
 }
 
 // Update week display

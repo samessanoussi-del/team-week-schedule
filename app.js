@@ -13,6 +13,45 @@ let weeklyTimeTracking = {}; // Format: { "2024-01-15": { "John": { "Client A": 
 let undoHistory = [];
 let maxHistorySize = 50;
 
+// Calculate if a color is light or dark, returns 'white' or 'black' for text color
+function getContrastTextColor(backgroundColor) {
+    if (!backgroundColor) return 'white';
+    
+    // Convert hex to RGB
+    let r, g, b;
+    if (backgroundColor.startsWith('#')) {
+        const hex = backgroundColor.slice(1);
+        if (hex.length === 3) {
+            r = parseInt(hex[0] + hex[0], 16);
+            g = parseInt(hex[1] + hex[1], 16);
+            b = parseInt(hex[2] + hex[2], 16);
+        } else if (hex.length === 6) {
+            r = parseInt(hex.slice(0, 2), 16);
+            g = parseInt(hex.slice(2, 4), 16);
+            b = parseInt(hex.slice(4, 6), 16);
+        } else {
+            return 'white'; // Invalid hex
+        }
+    } else if (backgroundColor.startsWith('rgb')) {
+        const matches = backgroundColor.match(/\d+/g);
+        if (matches && matches.length >= 3) {
+            r = parseInt(matches[0]);
+            g = parseInt(matches[1]);
+            b = parseInt(matches[2]);
+        } else {
+            return 'white';
+        }
+    } else {
+        return 'white'; // Unknown format
+    }
+    
+    // Calculate relative luminance (WCAG formula)
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    
+    // Return black for light backgrounds, white for dark backgrounds
+    return luminance > 0.5 ? 'black' : 'white';
+}
+
 // Initialize app
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('🚀 Initializing app...');
@@ -938,21 +977,23 @@ function renderCalendar() {
                     assignmentDiv.draggable = isAdminMode;
                     assignmentDiv.dataset.sourceBlock = blockKey;
                     assignmentDiv.dataset.assignmentIndex = assignmentIndex;
+                    const memberTextColor = getContrastTextColor(memberColor);
+                    const clientTextColor = getContrastTextColor(clientColor);
                     assignmentDiv.innerHTML = `
                         <div class="assignment-container">
-                            <div class="assignment-member-section" style="background-color: ${memberColor}">
+                            <div class="assignment-member-section" style="background-color: ${memberColor}; color: ${memberTextColor};">
                                 <div class="assignment-member-circle">
                                     ${profilePicture ? 
                                         `<img src="${profilePicture}" alt="${assignment.member}" class="assignment-profile-picture">` : 
-                                        `<span class="assignment-member-initial">${assignment.member.charAt(0).toUpperCase()}</span>`
+                                        `<span class="assignment-member-initial" style="color: ${memberTextColor};">${assignment.member.charAt(0).toUpperCase()}</span>`
                                     }
                                 </div>
                                 <div class="assignment-member-box">
-                                    <span class="assignment-member-name">${assignment.member}</span>
+                                    <span class="assignment-member-name" style="color: ${memberTextColor};">${assignment.member}</span>
                                 </div>
                             </div>
-                            <div class="assignment-client-box" style="background-color: ${clientColor}">
-                                <span class="assignment-client-name">${assignment.client}</span>
+                            <div class="assignment-client-box" style="background-color: ${clientColor};">
+                                <span class="assignment-client-name" style="color: ${clientTextColor};">${assignment.client}</span>
                                 ${isAdminMode ? `<button class="assignment-remove" onclick="removeAssignment('${blockKey}', ${assignmentIndex})">×</button>` : ''}
                             </div>
                         </div>

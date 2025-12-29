@@ -1740,6 +1740,7 @@ body.bright-theme input[type="week"]::-webkit-calendar-picker-indicator {
     display: grid;
     grid-template-columns: 1fr;
     align-content: start;
+    gap: 1rem;
 }
 
 .time-tracking-members {

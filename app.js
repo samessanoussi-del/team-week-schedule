@@ -1609,6 +1609,11 @@ function getWeekNumber(date) {
 function renderTimeTracking() {
     const timeTrackingContent = document.getElementById('timeTrackingContent');
     if (!timeTrackingContent) return;
+    // #region agent log
+    const leftCol = document.querySelector('.settings-left-column');
+    const rightCol = document.querySelector('.settings-right-column');
+    fetch('http://127.0.0.1:7242/ingest/ec7ef1a8-7389-4213-a659-4b03335bac18',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:1609',message:'renderTimeTracking called - before render',data:{leftColHeight:leftCol?.offsetHeight,rightColHeight:rightCol?.offsetHeight,timeTrackingHeight:timeTrackingContent?.offsetHeight,timeTrackingScrollHeight:timeTrackingContent?.scrollHeight},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,B'})}).catch(()=>{});
+    // #endregion
     
     // Use timeTrackingWeekStart (separate from calendar week, but syncs when settings opens)
     // If timeTrackingWeekStart is not set, use currentWeekStart
@@ -1750,6 +1755,14 @@ function renderTimeTracking() {
     
     html += '</div>';
     timeTrackingContent.innerHTML = html;
+    // #region agent log
+    setTimeout(() => {
+        const leftCol = document.querySelector('.settings-left-column');
+        const rightCol = document.querySelector('.settings-right-column');
+        const settingsSection = document.querySelector('.settings-section:last-child');
+        fetch('http://127.0.0.1:7242/ingest/ec7ef1a8-7389-4213-a659-4b03335bac18',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:1757',message:'renderTimeTracking completed - after render',data:{leftColHeight:leftCol?.offsetHeight,rightColHeight:rightCol?.offsetHeight,timeTrackingHeight:timeTrackingContent?.offsetHeight,timeTrackingScrollHeight:timeTrackingContent?.scrollHeight,settingsSectionHeight:settingsSection?.offsetHeight,leftColComputed:leftCol?window.getComputedStyle(leftCol).height:'N/A',rightColComputed:rightCol?window.getComputedStyle(rightCol).height:'N/A',timeTrackingComputed:timeTrackingContent?window.getComputedStyle(timeTrackingContent).height:'N/A',timeTrackingMaxHeight:timeTrackingContent?window.getComputedStyle(timeTrackingContent).maxHeight:'N/A'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,B,C,E'})}).catch(()=>{});
+    }, 50);
+    // #endregion
 }
 
 // Update time tracking
@@ -1784,6 +1797,17 @@ function setupEventListeners() {
         } else {
             document.getElementById('settingsModal').classList.add('show');
             renderSettings();
+            // #region agent log
+            setTimeout(() => {
+                const leftCol = document.querySelector('.settings-left-column');
+                const rightCol = document.querySelector('.settings-right-column');
+                const timeTrackingContent = document.getElementById('timeTrackingContent');
+                const settingsSection = document.querySelector('.settings-section:last-child');
+                const modalBody = document.querySelector('.modal-body');
+                const settingsLayout = document.querySelector('.settings-layout');
+                fetch('http://127.0.0.1:7242/ingest/ec7ef1a8-7389-4213-a659-4b03335bac18',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:1786',message:'Settings modal opened - height measurements',data:{leftColHeight:leftCol?.offsetHeight,rightColHeight:rightCol?.offsetHeight,timeTrackingHeight:timeTrackingContent?.offsetHeight,timeTrackingScrollHeight:timeTrackingContent?.scrollHeight,settingsSectionHeight:settingsSection?.offsetHeight,modalBodyHeight:modalBody?.offsetHeight,settingsLayoutHeight:settingsLayout?.offsetHeight,leftColComputed:leftCol?window.getComputedStyle(leftCol).height:'N/A',rightColComputed:rightCol?window.getComputedStyle(rightCol).height:'N/A'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,B,C,D'})}).catch(()=>{});
+            }, 100);
+            // #endregion
         }
     });
 

@@ -939,7 +939,7 @@ function renderCalendar() {
                     assignmentDiv.dataset.sourceBlock = blockKey;
                     assignmentDiv.dataset.assignmentIndex = assignmentIndex;
                     assignmentDiv.innerHTML = `
-                        <div class="assignment-container" style="border-radius: 50px;">
+                        <div class="assignment-container">
                             <div class="assignment-member-section" style="background-color: ${memberColor}">
                                 <div class="assignment-member-circle">
                                     ${profilePicture ? 

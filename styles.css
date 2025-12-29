@@ -661,6 +661,20 @@ body.bright-theme .time-header {
     padding: 1rem;
     text-align: center;
     font-weight: 600;
+    position: relative;
+}
+
+.day-header.today {
+    background: rgba(255, 193, 7, 0.2);
+    border-bottom: 3px solid #ffc107;
+    color: #ffc107;
+    font-weight: 700;
+}
+
+body.bright-theme .day-header.today {
+    background: rgba(255, 193, 7, 0.15);
+    border-bottom-color: #ffc107;
+    color: #f57c00;
 }
 
 .calendar-body {

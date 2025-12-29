@@ -24,7 +24,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateStats();
     setupRealtimeSubscriptions();
     renderTimeTracking();
+    updateDayHeaders();
     console.log('✅ App initialized');
+    
+    // Update day headers every minute to catch day changes
+    setInterval(() => {
+        updateDayHeaders();
+        renderCalendar(); // Re-render to update day columns too
+    }, 60000); // Check every minute
 });
 
 // Real-time subscription channels
@@ -859,6 +866,10 @@ function renderCalendar() {
     
     // Render time column
     renderTimeColumn();
+    
+    // Get today's date for comparison
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
     days.forEach((day, dayIndex) => {
         const dayColumn = document.createElement('div');
@@ -866,6 +877,14 @@ function renderCalendar() {
 
         const dayDate = new Date(currentWeekStart);
         dayDate.setDate(currentWeekStart.getDate() + dayIndex);
+        dayDate.setHours(0, 0, 0, 0);
+        
+        // Check if this day is today
+        const isToday = dayDate.getTime() === today.getTime();
+        if (isToday) {
+            dayColumn.classList.add('today');
+        }
+        
         const dateKey = formatDateKey(dayDate, day);
 
         timeBlocks.forEach((block, blockIndex) => {
@@ -1900,6 +1919,7 @@ function setupEventListeners() {
         saveData();
         renderCalendar();
         updateWeekDisplay();
+        updateDayHeaders();
         updateStats();
         renderTimeTracking();
     });
@@ -1909,6 +1929,7 @@ function setupEventListeners() {
         saveData();
         renderCalendar();
         updateWeekDisplay();
+        updateDayHeaders();
         updateStats();
         renderTimeTracking();
     });

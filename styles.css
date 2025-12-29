@@ -777,6 +777,19 @@ body.bright-theme .day-header.today {
 .day-column {
     flex: 1;
     border-right: 1px solid;
+    position: relative;
+}
+
+.day-column.today {
+    background: rgba(255, 193, 7, 0.05);
+    border-left: 3px solid #ffc107;
+    border-right: 3px solid #ffc107;
+}
+
+body.bright-theme .day-column.today {
+    background: rgba(255, 193, 7, 0.08);
+    border-left-color: #ffc107;
+    border-right-color: #ffc107;
 }
 
 .time-block {

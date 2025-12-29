@@ -29,16 +29,31 @@
         <div class="main-content">
             <!-- Sidebar Menu -->
             <aside class="sidebar">
-                <div class="menu-section">
-                    <h2>Production Members</h2>
-                    <div id="teamMembersList" class="draggable-list">
-                        <!-- Team members will be populated here -->
+                <div class="sidebar-top">
+                    <div class="menu-section">
+                        <h2>Production Members</h2>
+                        <div id="teamMembersList" class="draggable-list">
+                            <!-- Team members will be populated here -->
+                        </div>
+                    </div>
+                    <div class="menu-section">
+                        <h2>Clients</h2>
+                        <div id="clientsList" class="draggable-list">
+                            <!-- Clients will be populated here -->
+                        </div>
                     </div>
                 </div>
-                <div class="menu-section">
-                    <h2>Clients</h2>
-                    <div id="clientsList" class="draggable-list">
-                        <!-- Clients will be populated here -->
+                <div class="menu-section time-tracking-section">
+                    <h2>Weekly Time Tracking</h2>
+                    <div class="time-tracking-controls">
+                        <div style="display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem;">
+                            <button id="timeTrackingPrevWeek" class="btn-nav" style="font-size: 0.9rem; padding: 0.5rem 1rem;">← Previous Week</button>
+                            <span id="timeTrackingWeekDisplay" class="week-display" style="flex: 1; text-align: center; font-weight: 600; color: var(--dark-primary);"></span>
+                            <button id="timeTrackingNextWeek" class="btn-nav" style="font-size: 0.9rem; padding: 0.5rem 1rem;">Next Week →</button>
+                        </div>
+                    </div>
+                    <div id="timeTrackingContent" class="time-tracking-content">
+                        <!-- Time tracking will be populated here -->
                     </div>
                 </div>
             </aside>

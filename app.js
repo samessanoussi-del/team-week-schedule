@@ -1543,15 +1543,7 @@ function renderSettings() {
         clientsList.appendChild(item);
     });
     
-    // Render time tracking section
-    // Sync time tracking week with current calendar week when settings opens
-    if (typeof window.timeTrackingWeekStart === 'undefined') {
-        window.timeTrackingWeekStart = new Date(currentWeekStart);
-    } else {
-        // Update to current week when settings opens
-        window.timeTrackingWeekStart = new Date(currentWeekStart);
-    }
-    renderTimeTracking();
+    // Time tracking is now in sidebar, not in settings
 }
 
 // Calculate assigned hours for a week

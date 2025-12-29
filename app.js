@@ -14,6 +14,7 @@ let maxHistorySize = 50;
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', async () => {
+    console.log('🚀 Initializing app...');
     await loadData();
     initializeCalendar();
     setupEventListeners();
@@ -21,6 +22,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderSettings();
     updateStats();
     setupRealtimeSubscriptions();
+    console.log('✅ App initialized');
 });
 
 // Real-time subscription channels

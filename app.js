@@ -33,6 +33,9 @@ let realtimeChannels = {
     appSettings: null
 };
 
+// Flag to prevent recursive updates
+let isSaving = false;
+
 // Setup real-time subscriptions
 function setupRealtimeSubscriptions() {
     // Check if supabase is available
@@ -47,62 +50,90 @@ function setupRealtimeSubscriptions() {
     realtimeChannels.teamMembers = supabase
         .channel('team_members_changes')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'team_members' }, async (payload) => {
-            console.log('📢 Real-time update: team_members changed', payload);
-            await loadTeamMembers();
+            // Skip if we're currently saving to prevent loops
+            if (isSaving) {
+                console.log('⏭️ Skipping real-time update (save in progress)');
+                return;
+            }
+            console.log('📢 Real-time update: team_members changed', payload.eventType);
+            await loadTeamMembers(true); // Skip defaults on real-time updates
             renderSidebar();
             renderSettings();
             renderCalendar();
             updateStats();
         })
         .subscribe((status) => {
-            console.log('Team members subscription status:', status);
+            if (status === 'SUBSCRIBED') {
+                console.log('✅ Team members subscription active');
+            }
         });
 
     // Subscribe to clients changes
     realtimeChannels.clients = supabase
         .channel('clients_changes')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'clients' }, async (payload) => {
-            console.log('📢 Real-time update: clients changed', payload);
-            await loadClients();
+            // Skip if we're currently saving to prevent loops
+            if (isSaving) {
+                console.log('⏭️ Skipping real-time update (save in progress)');
+                return;
+            }
+            console.log('📢 Real-time update: clients changed', payload.eventType);
+            await loadClients(true); // Skip defaults on real-time updates
             renderSidebar();
             renderSettings();
             renderCalendar();
             updateStats();
         })
         .subscribe((status) => {
-            console.log('Clients subscription status:', status);
+            if (status === 'SUBSCRIBED') {
+                console.log('✅ Clients subscription active');
+            }
         });
 
     // Subscribe to schedule changes
     realtimeChannels.schedule = supabase
         .channel('schedule_changes')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'schedule' }, async (payload) => {
-            console.log('📢 Real-time update: schedule changed', payload);
+            // Skip if we're currently saving to prevent loops
+            if (isSaving) {
+                console.log('⏭️ Skipping real-time update (save in progress)');
+                return;
+            }
+            console.log('📢 Real-time update: schedule changed', payload.eventType);
             await loadSchedule();
             renderCalendar();
             updateStats();
         })
         .subscribe((status) => {
-            console.log('Schedule subscription status:', status);
+            if (status === 'SUBSCRIBED') {
+                console.log('✅ Schedule subscription active');
+            }
         });
 
     // Subscribe to app_settings changes
     realtimeChannels.appSettings = supabase
         .channel('app_settings_changes')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' }, async (payload) => {
-            console.log('📢 Real-time update: app_settings changed', payload);
+            // Skip if we're currently saving to prevent loops
+            if (isSaving) {
+                console.log('⏭️ Skipping real-time update (save in progress)');
+                return;
+            }
+            console.log('📢 Real-time update: app_settings changed', payload.eventType);
             await loadAppSettings();
             renderCalendar();
         })
         .subscribe((status) => {
-            console.log('App settings subscription status:', status);
+            if (status === 'SUBSCRIBED') {
+                console.log('✅ App settings subscription active');
+            }
         });
     
     console.log('✅ Real-time subscriptions set up');
 }
 
 // Load team members from Supabase
-async function loadTeamMembers() {
+async function loadTeamMembers(skipDefaults = false) {
     // Check if supabase is available
     if (typeof supabase === 'undefined') {
         console.warn('Supabase not available, using localStorage');
@@ -130,15 +161,14 @@ async function loadTeamMembers() {
             throw error;
         }
 
-        console.log('Team members from Supabase:', data?.length || 0, data);
-
         if (data && data.length > 0) {
             teamMembers = data.map(m => ({
                 name: m.name,
                 color: m.color,
                 profilePicture: m.profile_picture || ''
             }));
-        } else {
+        } else if (!skipDefaults) {
+            // Only create defaults on initial load, not on real-time updates
             // Default data if empty
             console.log('No team members found, creating defaults...');
             teamMembers = [
@@ -147,7 +177,12 @@ async function loadTeamMembers() {
                 { name: 'Bob Johnson', color: '#50c878', profilePicture: '' }
             ];
             // Save defaults to database (don't await - let it happen in background)
-            saveTeamMembers().catch(err => console.error('Failed to save default team members:', err));
+            if (!isSaving) {
+                isSaving = true;
+                saveTeamMembers().catch(err => console.error('Failed to save default team members:', err)).finally(() => {
+                    isSaving = false;
+                });
+            }
         }
     } catch (error) {
         console.error('Error loading team members:', error);
@@ -167,7 +202,7 @@ async function loadTeamMembers() {
 }
 
 // Load clients from Supabase
-async function loadClients() {
+async function loadClients(skipDefaults = false) {
     // Check if supabase is available
     if (typeof supabase === 'undefined') {
         console.warn('Supabase not available, using localStorage');
@@ -195,14 +230,13 @@ async function loadClients() {
             throw error;
         }
 
-        console.log('Clients from Supabase:', data?.length || 0, data);
-
         if (data && data.length > 0) {
             clients = data.map(c => ({
                 name: c.name,
                 color: c.color
             }));
-        } else {
+        } else if (!skipDefaults) {
+            // Only create defaults on initial load, not on real-time updates
             // Default data if empty
             console.log('No clients found, creating defaults...');
             clients = [
@@ -211,7 +245,12 @@ async function loadClients() {
                 { name: 'Client C', color: '#f093fb' }
             ];
             // Save defaults to database (don't await - let it happen in background)
-            saveClients().catch(err => console.error('Failed to save default clients:', err));
+            if (!isSaving) {
+                isSaving = true;
+                saveClients().catch(err => console.error('Failed to save default clients:', err)).finally(() => {
+                    isSaving = false;
+                });
+            }
         }
     } catch (error) {
         console.error('Error loading clients:', error);
@@ -620,20 +659,22 @@ async function saveAppSettings() {
 
 // Save data to Supabase (with localStorage fallback)
 async function saveData() {
-    console.log('💾 Saving data to Supabase...', {
-        teamMembers: teamMembers.length,
-        clients: clients.length,
-        scheduleKeys: Object.keys(schedule).length
-    });
+    // Prevent recursive saves
+    if (isSaving) {
+        console.log('⏭️ Save already in progress, skipping...');
+        return;
+    }
     
+    isSaving = true;
     try {
         await saveTeamMembers();
         await saveClients();
         await saveSchedule();
         await saveAppSettings();
-        console.log('✅ Data saved successfully to Supabase');
     } catch (error) {
         console.error('❌ Error saving data:', error);
+    } finally {
+        isSaving = false;
     }
     
     // Admin mode stays in localStorage (per device)

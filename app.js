@@ -1508,9 +1508,13 @@ function calculateAssignedHours(weekStart) {
     const assignedHours = {}; // { memberName: { clientName: hours } }
     const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
     
+    // Ensure weekStart is a proper Date object and set to start of day
+    const weekStartDate = new Date(weekStart);
+    weekStartDate.setHours(0, 0, 0, 0);
+    
     days.forEach((day, dayIndex) => {
-        const dayDate = new Date(weekStart);
-        dayDate.setDate(weekStart.getDate() + dayIndex);
+        const dayDate = new Date(weekStartDate);
+        dayDate.setDate(weekStartDate.getDate() + dayIndex);
         const dateKey = formatDateKey(dayDate, day);
         
         timeBlocks.forEach(block => {
@@ -1524,7 +1528,10 @@ function calculateAssignedHours(weekStart) {
             const endHour = parseInt(block.endTime.split(':')[0]);
             const blockHours = endHour - startHour;
             
+            // Process each assignment in this block
             assignments.forEach(assignment => {
+                if (!assignment || !assignment.member || !assignment.client) return;
+                
                 if (!assignedHours[assignment.member]) {
                     assignedHours[assignment.member] = {};
                 }
@@ -1879,6 +1886,8 @@ function setupEventListeners() {
         saveData();
         renderCalendar();
         updateWeekDisplay();
+        updateStats();
+        renderTimeTracking();
     });
 
     document.getElementById('nextWeek').addEventListener('click', () => {
@@ -1886,6 +1895,8 @@ function setupEventListeners() {
         saveData();
         renderCalendar();
         updateWeekDisplay();
+        updateStats();
+        renderTimeTracking();
     });
 
     // Enter key support for inputs

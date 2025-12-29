@@ -1326,12 +1326,12 @@ body.bright-theme ::-webkit-scrollbar-thumb:hover {
 .stats-panel {
     position: fixed;
     bottom: 1rem;
-    left: 1rem;
+    left: 1.5rem; /* Match sidebar padding */
+    width: calc(250px - 3rem); /* Sidebar width (250px) minus padding on both sides (1.5rem * 2 = 3rem) */
     background: var(--dark-modal);
     border: 1px solid var(--dark-border);
     border-radius: 2px;
     padding: 1rem;
-    max-width: 300px;
     max-height: 400px;
     overflow-y: auto;
     box-shadow: 0 4px 12px rgba(0,0,0,0.3);

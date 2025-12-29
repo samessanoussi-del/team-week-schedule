@@ -1060,7 +1060,7 @@ body.bright-theme .close-btn:hover {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 2rem;
-    align-items: stretch;
+    align-items: start;
     min-height: 0;
 }
 
@@ -1069,15 +1069,17 @@ body.bright-theme .close-btn:hover {
     grid-template-rows: auto auto;
     gap: 2rem;
     align-content: start;
+    height: fit-content;
 }
 
 .settings-right-column {
     display: grid;
     grid-template-rows: 1fr;
     min-height: 0;
-    height: 100%;
+    max-height: 100%;
     align-content: start;
     overflow: hidden;
+    height: fit-content;
 }
 
 .settings-section {

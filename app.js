@@ -1750,14 +1750,15 @@ function renderTimeTracking() {
     
     html += '</div>';
     timeTrackingContent.innerHTML = html;
-    // #region agent log
+    // Constrain right column height to match left column after rendering
     setTimeout(() => {
         const leftCol = document.querySelector('.settings-left-column');
         const rightCol = document.querySelector('.settings-right-column');
-        const settingsSection = document.querySelector('.settings-section:last-child');
-        fetch('http://127.0.0.1:7242/ingest/ec7ef1a8-7389-4213-a659-4b03335bac18',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:1757',message:'renderTimeTracking completed - after render',data:{leftColHeight:leftCol?.offsetHeight,rightColHeight:rightCol?.offsetHeight,timeTrackingHeight:timeTrackingContent?.offsetHeight,timeTrackingScrollHeight:timeTrackingContent?.scrollHeight,settingsSectionHeight:settingsSection?.offsetHeight,leftColComputed:leftCol?window.getComputedStyle(leftCol).height:'N/A',rightColComputed:rightCol?window.getComputedStyle(rightCol).height:'N/A',timeTrackingComputed:timeTrackingContent?window.getComputedStyle(timeTrackingContent).height:'N/A',timeTrackingMaxHeight:timeTrackingContent?window.getComputedStyle(timeTrackingContent).maxHeight:'N/A'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,B,C,E'})}).catch(()=>{});
+        if (leftCol && rightCol) {
+            const leftHeight = leftCol.offsetHeight;
+            rightCol.style.maxHeight = leftHeight + 'px';
+        }
     }, 50);
-    // #endregion
 }
 
 // Update time tracking

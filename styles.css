@@ -1069,7 +1069,9 @@ body.bright-theme .close-btn:hover {
     display: grid;
     grid-template-rows: 1fr;
     min-height: 0;
+    max-height: 100%;
     align-content: start;
+    overflow: hidden;
 }
 
 .settings-section {

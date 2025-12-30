@@ -1071,6 +1071,19 @@ function renderCalendar() {
 
                 timeBlock.appendChild(assignmentsContainer);
 
+                // Add click handler to empty blocks (only in admin mode)
+                if (isAdminMode && assignments.length === 0) {
+                    timeBlock.style.cursor = 'pointer';
+                    timeBlock.classList.add('empty-block-clickable');
+                    timeBlock.addEventListener('click', (e) => {
+                        // Don't trigger if clicking inside the block (like clear buttons)
+                        if (e.target !== timeBlock && !e.target.classList.contains('empty-block-clickable')) {
+                            return;
+                        }
+                        showMemberModal(blockKey);
+                    });
+                }
+
                 // Add clear buttons
                 const clearBtnContainer = document.createElement('div');
                 clearBtnContainer.className = 'block-clear-buttons';
@@ -1373,6 +1386,47 @@ function handleAssignmentDrop(e, blockKey) {
 }
 
 // Show client selection modal
+// Show member selection modal
+function showMemberModal(blockKey) {
+    if (!isAdminMode) return;
+    
+    const modal = document.getElementById('memberModal');
+    const memberList = document.getElementById('memberSelectionList');
+    
+    memberList.innerHTML = '';
+    
+    if (teamMembers.length === 0) {
+        memberList.innerHTML = '<p style="text-align: center; color: #999; padding: 2rem;">No members available. Add members in Settings.</p>';
+    } else {
+        teamMembers.forEach(member => {
+            const option = document.createElement('div');
+            option.className = 'client-option';
+            option.style.borderColor = member.color;
+            const profileDisplay = member.profilePicture ? 
+                `<img src="${member.profilePicture}" alt="${member.name}" class="draggable-item-profile circular" style="background-color: ${member.color}; width: 40px; height: 40px; object-fit: cover; border-radius: 50%;">` :
+                `<div class="draggable-item-profile circular" style="background-color: ${member.color}; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; color: ${getContrastTextColor(member.color)}; font-weight: bold;">${member.name.charAt(0).toUpperCase()}</div>`;
+            option.innerHTML = `
+                ${profileDisplay}
+                <span>${member.name}</span>
+            `;
+            option.onclick = () => {
+                closeMemberModal();
+                showClientModal(member.name, blockKey);
+            };
+            memberList.appendChild(option);
+        });
+    }
+    
+    modal.classList.add('show');
+    window.currentBlockKey = blockKey;
+}
+
+// Close member modal
+function closeMemberModal() {
+    const modal = document.getElementById('memberModal');
+    modal.classList.remove('show');
+}
+
 function showClientModal(memberName, blockKey, assignmentIndex = null) {
     const modal = document.getElementById('clientModal');
     const clientList = document.getElementById('clientSelectionList');
@@ -1936,6 +1990,7 @@ function setupEventListeners() {
 
     // Client modal
     document.getElementById('closeClientModal').addEventListener('click', closeClientModal);
+    document.getElementById('closeMemberModal').addEventListener('click', closeMemberModal);
 
     // Close modals on outside click
     window.addEventListener('click', (e) => {
@@ -1948,6 +2003,10 @@ function setupEventListeners() {
         }
         if (e.target === clientModal) {
             closeClientModal();
+        }
+        const memberModal = document.getElementById('memberModal');
+        if (e.target === memberModal) {
+            closeMemberModal();
         }
         if (e.target === adminModal) {
             adminModal.classList.remove('show');

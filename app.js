@@ -961,11 +961,18 @@ function renderCalendar() {
                 const blockKey = `${dateKey}-${block.id}`;
                 const assignments = schedule[blockKey] || [];
 
+                // Sort assignments alphabetically by member name
+                const sortedAssignments = [...assignments].sort((a, b) => {
+                    const nameA = (a.member || '').toLowerCase();
+                    const nameB = (b.member || '').toLowerCase();
+                    return nameA.localeCompare(nameB);
+                });
+
                 // Create assignments container
                 const assignmentsContainer = document.createElement('div');
                 assignmentsContainer.className = 'assignments-container';
 
-                assignments.forEach((assignment, assignmentIndex) => {
+                sortedAssignments.forEach((assignment, assignmentIndex) => {
                     const member = teamMembers.find(m => m.name === assignment.member);
                     const client = clients.find(c => c.name === assignment.client);
                     const memberColor = member ? member.color : '#ce2828';

@@ -82,3 +82,4 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...';
 - First load might be slow as it migrates from localStorage to Supabase
 
 
+

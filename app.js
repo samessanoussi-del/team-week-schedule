@@ -972,11 +972,26 @@ function renderCalendar() {
                 const assignmentsContainer = document.createElement('div');
                 assignmentsContainer.className = 'assignments-container';
 
+                // Track which original indices we've already used to handle duplicates
+                const usedIndices = new Set();
                 sortedAssignments.forEach((assignment, sortedIndex) => {
-                    // Find the original index in the unsorted array
-                    const originalIndex = assignments.findIndex(a => 
-                        a.member === assignment.member && a.client === assignment.client
-                    );
+                    // Find the original index in the unsorted array, skipping already used ones
+                    let originalIndex = -1;
+                    for (let i = 0; i < assignments.length; i++) {
+                        if (!usedIndices.has(i) && 
+                            assignments[i].member === assignment.member && 
+                            assignments[i].client === assignment.client) {
+                            originalIndex = i;
+                            usedIndices.add(i);
+                            break;
+                        }
+                    }
+                    // Fallback if not found (shouldn't happen)
+                    if (originalIndex === -1) {
+                        originalIndex = assignments.findIndex(a => 
+                            a.member === assignment.member && a.client === assignment.client
+                        );
+                    }
                     
                     const member = teamMembers.find(m => m.name === assignment.member);
                     const client = clients.find(c => c.name === assignment.client);

@@ -972,7 +972,12 @@ function renderCalendar() {
                 const assignmentsContainer = document.createElement('div');
                 assignmentsContainer.className = 'assignments-container';
 
-                sortedAssignments.forEach((assignment, assignmentIndex) => {
+                sortedAssignments.forEach((assignment, sortedIndex) => {
+                    // Find the original index in the unsorted array
+                    const originalIndex = assignments.findIndex(a => 
+                        a.member === assignment.member && a.client === assignment.client
+                    );
+                    
                     const member = teamMembers.find(m => m.name === assignment.member);
                     const client = clients.find(c => c.name === assignment.client);
                     const memberColor = member ? member.color : '#ce2828';
@@ -983,7 +988,7 @@ function renderCalendar() {
                     assignmentDiv.className = 'assignment';
                     assignmentDiv.draggable = isAdminMode;
                     assignmentDiv.dataset.sourceBlock = blockKey;
-                    assignmentDiv.dataset.assignmentIndex = assignmentIndex;
+                    assignmentDiv.dataset.assignmentIndex = originalIndex;
                     const memberTextColor = getContrastTextColor(memberColor);
                     const clientTextColor = getContrastTextColor(clientColor);
                     assignmentDiv.innerHTML = `
@@ -1001,7 +1006,7 @@ function renderCalendar() {
                             </div>
                             <div class="assignment-client-box" style="background-color: ${clientColor};">
                                 <span class="assignment-client-name" style="color: ${clientTextColor};">${assignment.client}</span>
-                                ${isAdminMode ? `<button class="assignment-remove" onclick="removeAssignment('${blockKey}', ${assignmentIndex})">×</button>` : ''}
+                                ${isAdminMode ? `<button class="assignment-remove" onclick="removeAssignment('${blockKey}', ${originalIndex})">×</button>` : ''}
                             </div>
                         </div>
                     `;
@@ -1014,7 +1019,7 @@ function renderCalendar() {
                             if (e.target.classList.contains('assignment-remove')) {
                                 return;
                             }
-                            editAssignmentClient(blockKey, assignmentIndex, assignment);
+                            editAssignmentClient(blockKey, originalIndex, assignment);
                         });
                     }
                     
@@ -1023,7 +1028,7 @@ function renderCalendar() {
                         assignmentDiv.addEventListener('dragstart', (e) => {
                             e.dataTransfer.setData('text/plain', JSON.stringify({
                                 sourceBlock: blockKey,
-                                assignmentIndex: assignmentIndex,
+                                assignmentIndex: originalIndex,
                                 assignment: assignment
                             }));
                             assignmentDiv.classList.add('dragging-assignment');
@@ -1042,7 +1047,7 @@ function renderCalendar() {
                             if (e.target.classList.contains('assignment-remove')) {
                                 return;
                             }
-                            editAssignmentClient(blockKey, assignmentIndex, assignment);
+                            editAssignmentClient(blockKey, originalIndex, assignment);
                         });
                     }
                     

@@ -29,16 +29,32 @@
         <div class="main-content">
             <!-- Sidebar Menu -->
             <aside class="sidebar">
-                <div class="menu-section">
-                    <h2>Production Members</h2>
-                    <div id="teamMembersList" class="draggable-list">
-                        <!-- Team members will be populated here -->
+                <div class="sidebar-content">
+                    <div class="menu-section">
+                        <h2>Production Members</h2>
+                        <div id="teamMembersList" class="draggable-list">
+                            <!-- Team members will be populated here -->
+                        </div>
+                    </div>
+                    <div class="menu-section clients-section">
+                        <h2>Clients</h2>
+                        <div id="clientsList" class="draggable-list clients-list">
+                            <!-- Clients will be populated here -->
+                        </div>
                     </div>
                 </div>
-                <div class="menu-section">
-                    <h2>Clients</h2>
-                    <div id="clientsList" class="draggable-list">
-                        <!-- Clients will be populated here -->
+                <!-- Stats Panel -->
+                <div class="stats-panel">
+                    <h3>Statistics</h3>
+                    <div class="stats-content">
+                        <div class="stats-section">
+                            <h4>Hours per Person</h4>
+                            <div id="personStats" class="stats-list"></div>
+                        </div>
+                        <div class="stats-section">
+                            <h4>Hours per Client</h4>
+                            <div id="clientStats" class="stats-list"></div>
+                        </div>
                     </div>
                 </div>
             </aside>
@@ -67,21 +83,6 @@
                     </div>
                 </div>
             </main>
-        </div>
-        
-        <!-- Stats Panel -->
-        <div class="stats-panel">
-            <h3>Statistics</h3>
-            <div class="stats-content">
-                <div class="stats-section">
-                    <h4>Hours per Person</h4>
-                    <div id="personStats" class="stats-list"></div>
-                </div>
-                <div class="stats-section">
-                    <h4>Hours per Client</h4>
-                    <div id="clientStats" class="stats-list"></div>
-                </div>
-            </div>
         </div>
         
         <!-- Watermark -->

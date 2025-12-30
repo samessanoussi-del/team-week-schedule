@@ -532,12 +532,37 @@ body.bright-theme .mode-indicator.admin {
 .sidebar {
     width: 250px;
     padding: 1.5rem;
-    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
     box-shadow: 2px 0 5px rgba(0,0,0,0.05);
+    overflow: hidden;
+}
+
+.sidebar-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
 }
 
 .menu-section {
     margin-bottom: 2rem;
+    flex-shrink: 0;
+}
+
+.menu-section.clients-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    margin-bottom: 0;
+}
+
+.clients-list {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
 }
 
 .menu-section h2 {
@@ -1369,18 +1394,15 @@ body.bright-theme ::-webkit-scrollbar-thumb:hover {
 
 /* Stats Panel */
 .stats-panel {
-    position: fixed;
-    bottom: 1rem;
-    left: 1.5rem; /* Match sidebar padding */
-    width: calc(250px - 3rem); /* Sidebar width (250px) minus padding on both sides (1.5rem * 2 = 3rem) */
+    flex-shrink: 0;
     background: var(--dark-modal);
     border: 1px solid var(--dark-border);
     border-radius: 2px;
     padding: 1rem;
+    margin-top: 1rem;
     max-height: 400px;
     overflow-y: auto;
     box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-    z-index: 100;
 }
 
 body.bright-theme .stats-panel {

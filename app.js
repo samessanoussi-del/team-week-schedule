@@ -1076,8 +1076,10 @@ function renderCalendar() {
                     timeBlock.style.cursor = 'pointer';
                     timeBlock.classList.add('empty-block-clickable');
                     timeBlock.addEventListener('click', (e) => {
-                        // Don't trigger if clicking inside the block (like clear buttons)
-                        if (e.target !== timeBlock && !e.target.classList.contains('empty-block-clickable')) {
+                        // Don't trigger if clicking on buttons or assignments
+                        if (e.target.classList.contains('block-clear-btn') || 
+                            e.target.closest('.assignment') ||
+                            e.target.closest('.block-clear-buttons')) {
                             return;
                         }
                         showMemberModal(blockKey);

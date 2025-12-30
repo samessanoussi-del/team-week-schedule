@@ -637,14 +637,18 @@ body.bright-theme .menu-section h2 {
     position: sticky;
     top: 0;
     z-index: 10;
+    min-width: 0;
 }
 
 .time-header {
     width: 150px;
+    min-width: 150px;
+    flex-shrink: 0;
     border-right: 2px solid;
     padding: 1rem;
     font-weight: 600;
     color: var(--dark-primary);
+    box-sizing: border-box;
 }
 
 body.bright-theme .time-header {
@@ -654,14 +658,17 @@ body.bright-theme .time-header {
 .days-header {
     display: flex;
     flex: 1;
+    min-width: 0;
 }
 
 .day-header {
     flex: 1;
+    min-width: 0;
     padding: 1rem;
     text-align: center;
     font-weight: 600;
     position: relative;
+    box-sizing: border-box;
 }
 
 .day-header.today {
@@ -680,11 +687,15 @@ body.bright-theme .day-header.today {
 .calendar-body {
     display: flex;
     flex: 1;
+    min-width: 0;
 }
 
 .time-column {
     width: 150px;
+    min-width: 150px;
+    flex-shrink: 0;
     border-right: 2px solid;
+    box-sizing: border-box;
 }
 
 .time-slot {
@@ -771,13 +782,16 @@ body.bright-theme .day-header.today {
 .calendar-grid {
     display: flex;
     flex: 1;
+    min-width: 0;
     position: relative;
 }
 
 .day-column {
     flex: 1;
+    min-width: 0;
     border-right: 1px solid;
     position: relative;
+    box-sizing: border-box;
 }
 
 .day-column.today {

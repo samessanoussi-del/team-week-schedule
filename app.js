@@ -167,8 +167,21 @@ function setupRealtimeSubscriptions() {
                 console.log('⏭️ Skipping real-time update (save in progress)');
                 return;
             }
+            // Skip if the change is to currentWeekStart (we don't sync that)
+            if (payload.new && payload.new.key === 'currentWeekStart') {
+                console.log('⏭️ Skipping currentWeekStart sync (local only)');
+                return;
+            }
+            if (payload.old && payload.old.key === 'currentWeekStart') {
+                console.log('⏭️ Skipping currentWeekStart sync (local only)');
+                return;
+            }
             console.log('📢 Real-time update: app_settings changed', payload.eventType);
+            // Store current week before loading (to preserve local navigation)
+            const savedWeek = currentWeekStart;
             await loadAppSettings();
+            // Restore local week navigation (don't let Supabase override it)
+            currentWeekStart = savedWeek;
             renderCalendar();
         })
         .subscribe((status) => {
@@ -410,12 +423,25 @@ async function loadAppSettings() {
             data.forEach(setting => {
                 if (setting.key === 'timeBlocks') {
                     timeBlocks = setting.value;
-                } else if (setting.key === 'currentWeekStart') {
-                    currentWeekStart = new Date(setting.value);
                 } else if (setting.key === 'isDarkTheme') {
                     isDarkTheme = setting.value;
                 }
+                // Note: currentWeekStart is NOT loaded from Supabase - it stays local per device
             });
+        }
+
+        // Load currentWeekStart from localStorage only (never from Supabase)
+        const savedWeek = localStorage.getItem('currentWeekStart');
+        if (savedWeek) {
+            currentWeekStart = new Date(savedWeek);
+        } else {
+            const today = new Date();
+            const day = today.getDay();
+            const diff = today.getDate() - day + (day === 0 ? -6 : 1);
+            currentWeekStart = new Date(today.setDate(diff));
+            currentWeekStart.setHours(0, 0, 0, 0);
+            // Save to localStorage only
+            localStorage.setItem('currentWeekStart', currentWeekStart.toISOString());
         }
 
         // Set defaults if not found
@@ -428,15 +454,6 @@ async function loadAppSettings() {
             ];
             // Save defaults to database (don't await - let it happen in background)
             saveAppSettings().catch(err => console.error('Failed to save default time blocks:', err));
-        }
-
-        if (!currentWeekStart) {
-            const today = new Date();
-            const day = today.getDay();
-            const diff = today.getDate() - day + (day === 0 ? -6 : 1);
-            currentWeekStart = new Date(today.setDate(diff));
-            currentWeekStart.setHours(0, 0, 0, 0);
-            await saveAppSettings();
         }
     } catch (error) {
         console.error('Error loading app settings:', error);
@@ -781,9 +798,9 @@ async function saveWeeklyTimeTracking() {
 // Save app settings to Supabase
 async function saveAppSettings() {
     try {
+        // Only save timeBlocks and isDarkTheme to Supabase (currentWeekStart stays local)
         const settings = [
             { key: 'timeBlocks', value: timeBlocks },
-            { key: 'currentWeekStart', value: currentWeekStart.toISOString() },
             { key: 'isDarkTheme', value: isDarkTheme }
         ];
 
@@ -798,9 +815,11 @@ async function saveAppSettings() {
         console.error('Error saving app settings:', error);
         // Fallback to localStorage
         localStorage.setItem('timeBlocks', JSON.stringify(timeBlocks));
-        localStorage.setItem('currentWeekStart', currentWeekStart.toISOString());
         localStorage.setItem('isDarkTheme', isDarkTheme);
     }
+    
+    // Always save currentWeekStart to localStorage only (never to Supabase)
+    localStorage.setItem('currentWeekStart', currentWeekStart.toISOString());
 }
 
 // Save data to Supabase (with localStorage fallback)
@@ -2078,10 +2097,11 @@ function setupEventListeners() {
         saveData();
     });
 
-    // Week navigation
+    // Week navigation (local only - not synced across devices)
     document.getElementById('prevWeek').addEventListener('click', () => {
         currentWeekStart.setDate(currentWeekStart.getDate() - 7);
-        saveData();
+        // Save to localStorage only (not to Supabase)
+        localStorage.setItem('currentWeekStart', currentWeekStart.toISOString());
         renderCalendar();
         updateWeekDisplay();
         updateDayHeaders();
@@ -2091,7 +2111,8 @@ function setupEventListeners() {
 
     document.getElementById('nextWeek').addEventListener('click', () => {
         currentWeekStart.setDate(currentWeekStart.getDate() + 7);
-        saveData();
+        // Save to localStorage only (not to Supabase)
+        localStorage.setItem('currentWeekStart', currentWeekStart.toISOString());
         renderCalendar();
         updateWeekDisplay();
         updateDayHeaders();

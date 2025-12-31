@@ -1090,8 +1090,8 @@ function renderCalendar() {
 
                 timeBlock.appendChild(assignmentsContainer);
 
-                // Add click handler to empty blocks (only in admin mode)
-                if (isAdminMode && assignments.length === 0) {
+                // Add click handler to blocks (only in admin mode)
+                if (isAdminMode) {
                     timeBlock.style.cursor = 'pointer';
                     timeBlock.classList.add('empty-block-clickable');
                     timeBlock.addEventListener('click', (e) => {
@@ -1416,10 +1416,17 @@ function showMemberModal(blockKey) {
     
     memberList.innerHTML = '';
     
-    if (teamMembers.length === 0) {
-        memberList.innerHTML = '<p style="text-align: center; color: #999; padding: 2rem;">No members available. Add members in Settings.</p>';
+    // Get already assigned members for this block
+    const existingAssignments = schedule[blockKey] || [];
+    const assignedMemberNames = new Set(existingAssignments.map(a => a.member));
+    
+    // Filter out members who are already assigned to this block
+    const availableMembers = teamMembers.filter(member => !assignedMemberNames.has(member.name));
+    
+    if (availableMembers.length === 0) {
+        memberList.innerHTML = '<p style="text-align: center; color: #999; padding: 2rem;">All members are already assigned to this block.</p>';
     } else {
-        teamMembers.forEach(member => {
+        availableMembers.forEach(member => {
             const option = document.createElement('div');
             option.className = 'client-option';
             option.style.borderColor = member.color;

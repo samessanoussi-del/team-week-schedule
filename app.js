@@ -3320,41 +3320,44 @@ function closeLeadershipClientModal() {
     window.leadershipPendingEntry = null;
 }
 
-// Create time entry in leadership mode
-function createLeadershipTimeEntry(memberIndex, startHour, endHour, clientName) {
+// Create time entry in leadership mode (minute-based)
+function createLeadershipTimeEntry(memberIndex, startMinutes, endMinutes, clientName) {
     if (!isAdminMode || !window.leadershipPendingEntry) return;
     
-    const member = teamMembers[memberIndex];
+    const membersToUse = isLeadershipMode ? leadershipMembers : teamMembers;
+    const member = membersToUse[memberIndex];
     if (!member) return;
     
-    const duration = endHour - startHour + 1;
-    const startTime = `${startHour.toString().padStart(2, '0')}:00`;
-    const endTime = `${(endHour + 1).toString().padStart(2, '0')}:00`;
+    // Convert minutes to time strings
+    const startHour = Math.floor(startMinutes / 60);
+    const startMin = startMinutes % 60;
+    const endHour = Math.floor(endMinutes / 60);
+    const endMin = endMinutes % 60;
+    const startTime = `${startHour.toString().padStart(2, '0')}:${startMin.toString().padStart(2, '0')}`;
+    const endTime = `${endHour.toString().padStart(2, '0')}:${endMin.toString().padStart(2, '0')}`;
     
-    // Find or create a matching time block
-    let matchingBlock = timeBlocks.find(block => {
-        const blockStart = parseInt(block.startTime.split(':')[0]);
-        const blockEnd = parseInt(block.endTime.split(':')[0]);
-        return blockStart === startHour && blockEnd === endHour;
-    });
+    // Create a unique block ID for this time range
+    const blockId = `leadership-${startMinutes}-${endMinutes}`;
     
-    // If no matching block, create a temporary one for this entry
+    // Get current week's days - for now, add to Monday (can be enhanced to allow day selection)
+    const dayName = 'Monday';
+    const dayDate = new Date(currentWeekStart);
+    const dayDateKey = formatDateKey(dayDate, dayName);
+    const blockKey = `${dayDateKey}-${blockId}`;
+    
+    // Check if block exists, if not create it
+    let matchingBlock = timeBlocks.find(b => b.id === blockId);
     if (!matchingBlock) {
         matchingBlock = {
-            id: `leadership-${startHour}-${endHour}`,
+            id: blockId,
             label: `${startTime} - ${endTime}`,
             time: `${startTime} - ${endTime}`,
             startTime: startTime,
             endTime: endTime,
             isLunch: false
         };
+        timeBlocks.push(matchingBlock);
     }
-    
-    // Get current week's days - for now, add to Monday (can be enhanced)
-    const dayName = 'Monday';
-    const dayDate = new Date(currentWeekStart);
-    const dayDateKey = formatDateKey(dayDate, dayName);
-    const blockKey = `${dayDateKey}-${matchingBlock.id}`;
     
     if (!schedule[blockKey]) {
         schedule[blockKey] = [];

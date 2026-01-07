@@ -3088,7 +3088,8 @@ function renderLeadershipMode() {
             };
         });
         
-        memberColumn.addEventListener('mousemove', (e) => {
+        // Add global mouse handlers for drag (on document to catch mouseup outside column)
+        const handleMouseMove = (e) => {
             // Handle resize
             if (leadershipResizeState && leadershipResizeState.memberIndex === memberIndex) {
                 const columnRect = memberColumn.getBoundingClientRect();
@@ -3120,9 +3121,9 @@ function renderLeadershipMode() {
                     updateLeadershipDragPreview();
                 }
             }
-        });
+        };
         
-        memberColumn.addEventListener('mouseup', (e) => {
+        const handleMouseUp = (e) => {
             // Handle resize end
             if (leadershipResizeState && leadershipResizeState.memberIndex === memberIndex) {
                 const entry = leadershipResizeState.entry;
@@ -3130,6 +3131,8 @@ function renderLeadershipMode() {
                 const endMinutes = parseInt(entry.dataset.endMinutes);
                 saveLeadershipTimeEntry(entry.dataset.blockKey, entry.dataset.assignmentIndex, startMinutes, endMinutes);
                 leadershipResizeState = null;
+                document.removeEventListener('mousemove', handleMouseMove);
+                document.removeEventListener('mouseup', handleMouseUp);
                 return;
             }
             
@@ -3147,16 +3150,36 @@ function renderLeadershipMode() {
                         showLeadershipClientModal(memberIndex, start, end);
                     }
                     leadershipDragState = null;
+                    document.querySelectorAll('.leadership-hour-cell').forEach(cell => {
+                        cell.classList.remove('leadership-dragging');
+                        cell.style.backgroundColor = '';
+                    });
                 } else if (Date.now() - leadershipMouseDownState.time < 100) {
                     // Quick click - create 30 minute entry
                     const start = leadershipMouseDownState.startMinutes;
                     showLeadershipClientModal(memberIndex, start, start + 30);
                 }
                 leadershipMouseDownState = null;
+                document.removeEventListener('mousemove', handleMouseMove);
+                document.removeEventListener('mouseup', handleMouseUp);
+                memberColumn.style.cursor = '';
+                memberColumn.style.backgroundColor = '';
             }
-        });
+        };
         
-        // Handle mouse leave to clean up
+        memberColumn.addEventListener('mousemove', handleMouseMove);
+        
+        // Store handlers for cleanup
+        memberColumn._leadershipMouseMove = handleMouseMove;
+        memberColumn._leadershipMouseUp = handleMouseUp;
+        
+        // Add document-level listeners when drag starts
+        memberColumn.addEventListener('mousedown', () => {
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseup', handleMouseUp);
+        }, { once: true });
+        
+        // Handle mouse leave to clean up resize
         memberColumn.addEventListener('mouseleave', () => {
             if (leadershipResizeState && leadershipResizeState.memberIndex === memberIndex) {
                 const entry = leadershipResizeState.entry;

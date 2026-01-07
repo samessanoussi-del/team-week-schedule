@@ -1771,6 +1771,12 @@ function renderSettings() {
             </div>
             <span class="settings-item-name">${member.name}</span>
             <div class="settings-item-actions" style="${disabledStyle}">
+                <label class="leadership-toggle-label" title="Include in Leadership Members calendar">
+                    <input type="checkbox" class="leadership-toggle-checkbox" 
+                           ${leadershipMembers.find(m => m.name === member.name) ? 'checked' : ''}
+                           onchange="toggleProductionMemberToLeadership(${index}, this.checked)" ${disabledAttr}>
+                    <span class="leadership-toggle-text">Leadership</span>
+                </label>
                 <button class="btn-edit" onclick="editMember(${index})" ${disabledAttr}>Edit</button>
                 <button class="btn-delete" onclick="deleteMember(${index})" ${disabledAttr}>Delete</button>
             </div>
@@ -2334,10 +2340,15 @@ function updateWeekDisplay() {
 function updateMemberColor(index, color) {
     if (!isAdminMode) return;
     teamMembers[index].color = color;
+    syncProductionMemberToLeadership(teamMembers[index].name, teamMembers[index]);
     saveData();
     renderSidebar();
+    renderSettings();
     renderCalendar();
     updateStats();
+    if (isLeadershipMode) {
+        renderLeadershipMode();
+    }
 }
 
 // Update member profile picture
@@ -2348,10 +2359,14 @@ function updateMemberProfile(index, input) {
         const reader = new FileReader();
         reader.onload = (e) => {
             teamMembers[index].profilePicture = e.target.result;
+            syncProductionMemberToLeadership(teamMembers[index].name, teamMembers[index]);
             saveData();
             renderSidebar();
             renderSettings();
             renderCalendar();
+            if (isLeadershipMode) {
+                renderLeadershipMode();
+            }
         };
         reader.readAsDataURL(file);
     }
@@ -2386,11 +2401,17 @@ function editMember(index) {
             }
         });
         
+        // Sync to leadership members if they're toggled
+        syncProductionMemberToLeadership(oldName, teamMembers[index]);
+        
         saveData();
         renderSidebar();
         renderSettings();
         renderCalendar();
         updateStats();
+        if (isLeadershipMode) {
+            renderLeadershipMode();
+        }
     } else if (teamMembers.find(m => m.name === newName.trim())) {
         alert('Member with this name already exists!');
     }

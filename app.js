@@ -1,5 +1,6 @@
 // Data storage
 let teamMembers = []; // Format: [{ name: "John", color: "#ce2828", profilePicture: "data:image/..." }, ...]
+let leadershipMembers = []; // Format: [{ name: "John", color: "#ce2828", profilePicture: "data:image/..." }, ...]
 let clients = []; // Format: [{ name: "Client A", color: "#667eea" }, ...]
 let schedule = {}; // Format: { "2024-01-15-Monday-Work1": [{ member: "John", client: "Client A" }, ...] }
 let currentWeekStart = new Date();
@@ -496,6 +497,9 @@ async function loadData() {
     await loadTeamMembers();
     console.log('Loaded team members:', teamMembers.length);
     
+    await loadLeadershipMembers();
+    console.log('Loaded leadership members:', leadershipMembers.length);
+    
     await loadClients();
     console.log('Loaded clients:', clients.length);
     
@@ -611,6 +615,106 @@ async function saveTeamMembers() {
         console.error('Error saving team members:', error);
         // Fallback to localStorage
         localStorage.setItem('teamMembers', JSON.stringify(teamMembers));
+    }
+}
+
+// Load leadership members from Supabase
+async function loadLeadershipMembers(skipDefaults = false) {
+    // Check if supabase is available
+    if (typeof supabase === 'undefined') {
+        console.warn('Supabase not available, using localStorage');
+        const savedMembers = localStorage.getItem('leadershipMembers');
+        if (savedMembers) {
+            leadershipMembers = JSON.parse(savedMembers);
+        } else {
+            leadershipMembers = [];
+        }
+        return;
+    }
+    
+    try {
+        const { data, error } = await supabase
+            .from('leadership_members')
+            .select('*')
+            .order('name');
+
+        if (error) {
+            console.error('Supabase error loading leadership members:', error);
+            throw error;
+        }
+
+        if (data && data.length > 0) {
+            leadershipMembers = data.map(m => ({
+                name: m.name,
+                color: m.color,
+                profilePicture: m.profile_picture || ''
+            }));
+        } else {
+            leadershipMembers = [];
+        }
+    } catch (error) {
+        console.error('Error loading leadership members:', error);
+        // Fallback to localStorage
+        const savedMembers = localStorage.getItem('leadershipMembers');
+        if (savedMembers) {
+            leadershipMembers = JSON.parse(savedMembers);
+        } else {
+            leadershipMembers = [];
+        }
+    }
+}
+
+// Save leadership members to Supabase
+async function saveLeadershipMembers() {
+    // Check if supabase is available
+    if (typeof supabase === 'undefined') {
+        localStorage.setItem('leadershipMembers', JSON.stringify(leadershipMembers));
+        return;
+    }
+    
+    try {
+        // Get all existing members first
+        const { data: existing, error: selectError } = await supabase.from('leadership_members').select('id');
+        if (selectError) {
+            console.error('Error selecting existing leadership members:', selectError);
+            throw selectError;
+        }
+        
+        // Delete all existing members if any
+        if (existing && existing.length > 0) {
+            const idsToDelete = existing.map(m => m.id);
+            const { error: deleteError } = await supabase
+                .from('leadership_members')
+                .delete()
+                .in('id', idsToDelete);
+            if (deleteError) {
+                console.error('Error deleting leadership members:', deleteError);
+                throw deleteError;
+            }
+        }
+        
+        // Insert all current members
+        if (leadershipMembers.length > 0) {
+            const membersToInsert = leadershipMembers.map(m => ({
+                name: m.name,
+                color: m.color,
+                profile_picture: m.profilePicture || ''
+            }));
+            
+            const { error } = await supabase
+                .from('leadership_members')
+                .insert(membersToInsert);
+            
+            if (error) {
+                console.error('Error inserting leadership members:', error);
+                throw error;
+            }
+            console.log('✅ Saved', leadershipMembers.length, 'leadership members to Supabase');
+        }
+    } catch (error) {
+        console.error('Error saving leadership members:', error);
+        // Fallback to localStorage
+        localStorage.setItem('leadershipMembers', JSON.stringify(leadershipMembers));
     }
 }
 
@@ -833,6 +937,7 @@ async function saveData() {
     isSaving = true;
     try {
         await saveTeamMembers();
+        await saveLeadershipMembers();
         await saveClients();
         await saveSchedule();
         await saveAppSettings();
@@ -1637,6 +1742,7 @@ function renderSidebar() {
 // Render settings
 function renderSettings() {
     const membersList = document.getElementById('membersSettingsList');
+    const leadershipMembersList = document.getElementById('leadershipMembersSettingsList');
     const clientsList = document.getElementById('clientsSettingsList');
 
     membersList.innerHTML = '';
@@ -2084,6 +2190,33 @@ function setupEventListeners() {
         }
     });
 
+    // Add leadership member
+    const addLeadershipMemberBtn = document.getElementById('addLeadershipMemberBtn');
+    if (addLeadershipMemberBtn) {
+        addLeadershipMemberBtn.addEventListener('click', () => {
+            if (!isAdminMode) return;
+            const input = document.getElementById('newLeadershipMemberName');
+            const name = input.value.trim();
+            if (name && !leadershipMembers.find(m => m.name === name)) {
+                saveStateToHistory();
+                const defaultColors = ['#ce2828', '#4a90e2', '#50c878', '#ff6b6b', '#9b59b6', '#f39c12'];
+                leadershipMembers.push({
+                    name: name,
+                    color: defaultColors[leadershipMembers.length % defaultColors.length],
+                    profilePicture: ''
+                });
+                saveData();
+                renderSettings();
+                if (isLeadershipMode) {
+                    renderLeadershipMode();
+                }
+                input.value = '';
+            } else if (leadershipMembers.find(m => m.name === name)) {
+                alert('Leadership member already exists!');
+            }
+        });
+    }
+
     // Add client
     document.getElementById('addClientBtn').addEventListener('click', () => {
         if (!isAdminMode) return;
@@ -2340,6 +2473,88 @@ function deleteClient(index) {
     renderCalendar();
     updateStats();
 }
+
+// Leadership Member functions
+window.updateLeadershipMemberColor = function(index, color) {
+    if (!isAdminMode) return;
+    leadershipMembers[index].color = color;
+    saveData();
+    renderSettings();
+    if (isLeadershipMode) {
+        renderLeadershipMode();
+    }
+};
+
+window.updateLeadershipMemberProfile = function(index, input) {
+    if (!isAdminMode) return;
+    const file = input.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            leadershipMembers[index].profilePicture = e.target.result;
+            saveData();
+            renderSettings();
+            if (isLeadershipMode) {
+                renderLeadershipMode();
+            }
+        };
+        reader.readAsDataURL(file);
+    }
+};
+
+window.editLeadershipMember = function(index) {
+    if (!isAdminMode) return;
+    const newName = prompt('Enter new name:', leadershipMembers[index].name);
+    if (newName && newName.trim() && !leadershipMembers.find(m => m.name === newName.trim())) {
+        saveStateToHistory();
+        const oldName = leadershipMembers[index].name;
+        leadershipMembers[index].name = newName.trim();
+        
+        // Update all schedule entries with this member
+        Object.keys(schedule).forEach(key => {
+            if (Array.isArray(schedule[key])) {
+                schedule[key].forEach(assignment => {
+                    if (assignment.member === oldName) {
+                        assignment.member = newName.trim();
+                    }
+                });
+            }
+        });
+        
+        saveData();
+        renderSettings();
+        if (isLeadershipMode) {
+            renderLeadershipMode();
+        }
+        updateStats();
+    } else if (leadershipMembers.find(m => m.name === newName.trim())) {
+        alert('Leadership member with this name already exists!');
+    }
+};
+
+window.deleteLeadershipMember = function(index) {
+    if (!isAdminMode) return;
+    saveStateToHistory();
+    const memberName = leadershipMembers[index].name;
+    leadershipMembers.splice(index, 1);
+    
+    // Remove all schedule entries with this member
+    Object.keys(schedule).forEach(key => {
+        if (Array.isArray(schedule[key])) {
+            schedule[key] = schedule[key].filter(assignment => assignment.member !== memberName);
+            if (schedule[key].length === 0) {
+                delete schedule[key];
+            }
+        }
+    });
+    
+    saveData();
+    renderSettings();
+    if (isLeadershipMode) {
+        renderLeadershipMode();
+    }
+    updateStats();
+};
 
 // Apply theme
 function applyTheme() {
@@ -2682,7 +2897,8 @@ function applyViewModeRestrictions() {
 
 // Leadership Mode
 let isLeadershipMode = false;
-let leadershipDragState = null; // { memberIndex, startHour, startY, currentHour }
+let leadershipDragState = null; // { memberIndex, startMinutes, startY, currentMinutes, isDragging }
+let leadershipMouseDownState = null; // { time, y, timeout }
 
 // Toggle leadership mode
 function toggleLeadershipMode() {
@@ -2694,11 +2910,13 @@ function toggleLeadershipMode() {
     if (isLeadershipMode) {
         calendarView.style.display = 'none';
         leadershipView.style.display = 'flex';
+        leadershipBtn.textContent = '👥 Production Members';
         leadershipBtn.classList.add('active');
         renderLeadershipMode();
     } else {
         calendarView.style.display = 'flex';
         leadershipView.style.display = 'none';
+        leadershipBtn.textContent = '👥 Leadership Members';
         leadershipBtn.classList.remove('active');
     }
 }
@@ -2733,8 +2951,9 @@ function renderLeadershipMode() {
         timeColumn.appendChild(timeSlot);
     });
     
-    // Render member headers and columns
-    teamMembers.forEach((member, memberIndex) => {
+    // Render member headers and columns (use leadershipMembers in leadership mode)
+    const membersToShow = isLeadershipMode ? leadershipMembers : teamMembers;
+    membersToShow.forEach((member, memberIndex) => {
         // Header
         const memberHeader = document.createElement('div');
         memberHeader.className = 'leadership-member-header';
@@ -2749,97 +2968,66 @@ function renderLeadershipMode() {
         memberColumn.className = 'leadership-member-column';
         memberColumn.dataset.memberIndex = memberIndex;
         
-        // Create hour cells
-        hours.forEach(({ hour }) => {
-            const hourCell = document.createElement('div');
-            hourCell.className = 'leadership-hour-cell';
-            hourCell.dataset.memberIndex = memberIndex;
-            hourCell.dataset.hour = hour;
+        // Add global mouse handlers for this column
+        memberColumn.addEventListener('mousedown', (e) => {
+            if (!isAdminMode) return;
+            if (e.target.closest('.leadership-time-entry')) return; // Don't interfere with existing entries
             
-            // Add click and hold functionality
-            let mouseDownTime = null;
-            let mouseDownY = null;
-            let dragTimeout = null;
+            e.preventDefault();
+            const columnRect = memberColumn.getBoundingClientRect();
+            const relativeY = e.clientY - columnRect.top;
+            const cellHeight = 60;
+            const hourIndex = Math.floor(relativeY / cellHeight);
+            const startHour = Math.max(8, Math.min(20, 8 + hourIndex));
             
-            hourCell.addEventListener('mousedown', (e) => {
-                if (!isAdminMode) return;
-                e.preventDefault();
-                mouseDownTime = Date.now();
-                mouseDownY = e.clientY;
-                hourCell.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                
-                // Start drag after 100ms hold
-                dragTimeout = setTimeout(() => {
+            leadershipMouseDownState = {
+                time: Date.now(),
+                y: e.clientY,
+                startHour: startHour,
+                memberIndex: memberIndex,
+                timeout: setTimeout(() => {
                     leadershipDragState = {
                         memberIndex: memberIndex,
-                        startHour: hour,
-                        startY: mouseDownY,
-                        currentHour: hour
+                        startHour: startHour,
+                        startY: e.clientY,
+                        currentHour: startHour,
+                        isDragging: true
                     };
-                    hourCell.classList.add('leadership-dragging');
-                }, 100);
-            });
-            
-            // Handle mousemove on the column for better drag experience
-            memberColumn.addEventListener('mousemove', (e) => {
-                if (leadershipDragState && leadershipDragState.memberIndex === memberIndex) {
-                    const cellHeight = 60;
-                    const columnRect = memberColumn.getBoundingClientRect();
-                    const relativeY = e.clientY - columnRect.top;
-                    const hoursFromTop = Math.floor(relativeY / cellHeight);
-                    const newHour = Math.max(8, Math.min(20, 8 + hoursFromTop));
-                    
-                    if (newHour !== leadershipDragState.currentHour) {
-                        leadershipDragState.currentHour = newHour;
-                        updateLeadershipDragPreview();
-                    }
+                    document.querySelectorAll('.leadership-hour-cell').forEach(cell => {
+                        if (parseInt(cell.dataset.hour) === startHour && parseInt(cell.dataset.memberIndex) === memberIndex) {
+                            cell.classList.add('leadership-dragging');
+                        }
+                    });
+                }, 100)
+            };
+        });
+        
+        memberColumn.addEventListener('mousemove', (e) => {
+            if (leadershipDragState && leadershipDragState.memberIndex === memberIndex && leadershipDragState.isDragging) {
+                const columnRect = memberColumn.getBoundingClientRect();
+                const relativeY = e.clientY - columnRect.top;
+                const cellHeight = 60;
+                const hourIndex = Math.floor(relativeY / cellHeight);
+                const newHour = Math.max(8, Math.min(20, 8 + hourIndex));
+                
+                if (newHour !== leadershipDragState.currentHour) {
+                    leadershipDragState.currentHour = newHour;
+                    updateLeadershipDragPreview();
                 }
-            });
-            
-            hourCell.addEventListener('mouseup', (e) => {
-                if (dragTimeout) {
-                    clearTimeout(dragTimeout);
-                    dragTimeout = null;
+            }
+        });
+        
+        memberColumn.addEventListener('mouseup', (e) => {
+            if (leadershipMouseDownState && leadershipMouseDownState.memberIndex === memberIndex) {
+                if (leadershipMouseDownState.timeout) {
+                    clearTimeout(leadershipMouseDownState.timeout);
                 }
                 
-                if (leadershipDragState && leadershipDragState.memberIndex === memberIndex) {
+                if (leadershipDragState && leadershipDragState.memberIndex === memberIndex && leadershipDragState.isDragging) {
                     const start = Math.min(leadershipDragState.startHour, leadershipDragState.currentHour);
                     const end = Math.max(leadershipDragState.startHour, leadershipDragState.currentHour);
                     const duration = end - start + 1;
-                    if (duration > 0 && mouseDownTime && Date.now() - mouseDownTime > 100) {
-                        showLeadershipClientModal(memberIndex, start, end);
-                    }
-                    leadershipDragState = null;
-                    hourCell.classList.remove('leadership-dragging');
-                    hourCell.style.backgroundColor = '';
-                } else if (mouseDownTime && Date.now() - mouseDownTime < 100) {
-                    // Quick click - create 1 hour entry
-                    showLeadershipClientModal(memberIndex, hour, hour);
-                }
-                mouseDownTime = null;
-            });
-            
-            hourCell.addEventListener('mouseleave', () => {
-                if (dragTimeout) {
-                    clearTimeout(dragTimeout);
-                    dragTimeout = null;
-                }
-                if (!leadershipDragState || leadershipDragState.memberIndex !== memberIndex) {
-                    hourCell.style.backgroundColor = '';
-                }
-            });
-            
-            // Handle mouseup on column to catch releases outside cells
-            memberColumn.addEventListener('mouseup', (e) => {
-                if (leadershipDragState && leadershipDragState.memberIndex === memberIndex) {
-                    if (dragTimeout) {
-                        clearTimeout(dragTimeout);
-                        dragTimeout = null;
-                    }
-                    const start = Math.min(leadershipDragState.startHour, leadershipDragState.currentHour);
-                    const end = Math.max(leadershipDragState.startHour, leadershipDragState.currentHour);
-                    const duration = end - start + 1;
-                    if (duration > 0 && mouseDownTime && Date.now() - mouseDownTime > 100) {
+                    if (duration > 0 && Date.now() - leadershipMouseDownState.time > 100) {
                         showLeadershipClientModal(memberIndex, start, end);
                     }
                     leadershipDragState = null;
@@ -2847,12 +3035,20 @@ function renderLeadershipMode() {
                         cell.classList.remove('leadership-dragging');
                         cell.style.backgroundColor = '';
                     });
-                    mouseDownTime = null;
+                } else if (Date.now() - leadershipMouseDownState.time < 100) {
+                    // Quick click - create 1 hour entry
+                    showLeadershipClientModal(memberIndex, leadershipMouseDownState.startHour, leadershipMouseDownState.startHour);
                 }
-            });
-            
-            // Render existing time entries for this hour
-            renderLeadershipTimeEntries(memberColumn, memberIndex, hour);
+                leadershipMouseDownState = null;
+            }
+        });
+        
+        // Create hour cells
+        hours.forEach(({ hour }) => {
+            const hourCell = document.createElement('div');
+            hourCell.className = 'leadership-hour-cell';
+            hourCell.dataset.memberIndex = memberIndex;
+            hourCell.dataset.hour = hour;
             
             memberColumn.appendChild(hourCell);
         });
@@ -2917,7 +3113,8 @@ function renderAllLeadershipTimeEntries() {
             const assignments = schedule[blockKey] || [];
             
             assignments.forEach(assignment => {
-                const memberIndex = teamMembers.findIndex(m => m.name === assignment.member);
+                const membersToSearch = isLeadershipMode ? leadershipMembers : teamMembers;
+                const memberIndex = membersToSearch.findIndex(m => m.name === assignment.member);
                 if (memberIndex === -1) return;
                 
                 // Parse block times

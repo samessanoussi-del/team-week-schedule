@@ -2055,8 +2055,8 @@ body.bright-theme .leadership-time-header {
 }
 
 .leadership-member-header {
-    min-width: 200px;
-    width: 200px;
+    min-width: 300px;
+    width: 300px;
     flex-shrink: 0;
     padding: 1rem;
     text-align: center;
@@ -2100,6 +2100,21 @@ body.bright-theme .leadership-time-column {
     display: flex;
     align-items: center;
     box-sizing: border-box;
+    position: relative;
+}
+
+.leadership-hour-slot::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 1px;
+    background: var(--dark-border);
+}
+
+body.bright-theme .leadership-hour-slot::after {
+    background: var(--bright-border);
 }
 
 body.bright-theme .leadership-hour-slot {
@@ -2115,8 +2130,8 @@ body.bright-theme .leadership-hour-slot {
 }
 
 .leadership-member-column {
-    min-width: 200px;
-    width: 200px;
+    min-width: 300px;
+    width: 300px;
     flex-shrink: 0;
     border-right: 1px solid var(--dark-border);
     position: relative;
@@ -2165,6 +2180,33 @@ body.bright-theme .leadership-hour-cell:hover {
     align-items: center;
     justify-content: space-between;
     gap: 0.25rem;
+    min-height: 20px;
+}
+
+.leadership-time-entry.editing {
+    z-index: 10;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+}
+
+.leadership-time-entry-resize-handle {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 4px;
+    cursor: ns-resize;
+    z-index: 3;
+}
+
+.leadership-time-entry-resize-handle.top {
+    top: 0;
+}
+
+.leadership-time-entry-resize-handle.bottom {
+    bottom: 0;
+}
+
+.leadership-time-entry-resize-handle:hover {
+    background: rgba(255, 255, 255, 0.3);
 }
 
 .leadership-time-entry:hover {

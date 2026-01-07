@@ -2192,21 +2192,33 @@ body.bright-theme .leadership-hour-cell:hover {
     position: absolute;
     left: 0;
     right: 0;
-    height: 4px;
+    height: 6px;
     cursor: ns-resize;
     z-index: 3;
+    background: transparent;
+    transition: background 0.2s;
 }
 
 .leadership-time-entry-resize-handle.top {
     top: 0;
+    border-radius: 4px 4px 0 0;
 }
 
 .leadership-time-entry-resize-handle.bottom {
     bottom: 0;
+    border-radius: 0 0 4px 4px;
 }
 
 .leadership-time-entry-resize-handle:hover {
-    background: rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.4);
+}
+
+.leadership-time-entry.editable {
+    cursor: pointer;
+}
+
+.leadership-time-entry.editable:hover {
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
 }
 
 .leadership-time-entry:hover {

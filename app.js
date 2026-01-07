@@ -3066,26 +3066,30 @@ function renderLeadershipMode() {
             }
             
             e.preventDefault();
+            e.stopPropagation();
             const columnRect = memberColumn.getBoundingClientRect();
             const relativeY = e.clientY - columnRect.top;
             // Convert pixels to minutes (60px per hour, so 1px = 1 minute)
             const startMinutes = Math.max(480, Math.min(1200, Math.round(relativeY))); // 8:00 AM = 480 min, 8:00 PM = 1200 min
             
+            // Start drag immediately
+            leadershipDragState = {
+                memberIndex: memberIndex,
+                startMinutes: startMinutes,
+                startY: e.clientY,
+                currentMinutes: startMinutes,
+                isDragging: false // Will be set to true when mouse moves
+            };
+            
             leadershipMouseDownState = {
                 time: Date.now(),
                 y: e.clientY,
                 startMinutes: startMinutes,
-                memberIndex: memberIndex,
-                timeout: setTimeout(() => {
-                    leadershipDragState = {
-                        memberIndex: memberIndex,
-                        startMinutes: startMinutes,
-                        startY: e.clientY,
-                        currentMinutes: startMinutes,
-                        isDragging: true
-                    };
-                }, 100)
+                memberIndex: memberIndex
             };
+            
+            // Visual feedback
+            memberColumn.style.cursor = 'ns-resize';
         });
         
         // Add global mouse handlers for drag (on document to catch mouseup outside column)
@@ -3111,10 +3115,15 @@ function renderLeadershipMode() {
             }
             
             // Handle drag
-            if (leadershipDragState && leadershipDragState.memberIndex === memberIndex && leadershipDragState.isDragging) {
+            if (leadershipDragState && leadershipDragState.memberIndex === memberIndex) {
                 const columnRect = memberColumn.getBoundingClientRect();
                 const relativeY = e.clientY - columnRect.top;
                 const newMinutes = Math.max(480, Math.min(1200, Math.round(relativeY)));
+                
+                // Mark as dragging if mouse has moved
+                if (Math.abs(newMinutes - leadershipDragState.startMinutes) > 2) {
+                    leadershipDragState.isDragging = true;
+                }
                 
                 if (newMinutes !== leadershipDragState.currentMinutes) {
                     leadershipDragState.currentMinutes = newMinutes;
@@ -3137,47 +3146,41 @@ function renderLeadershipMode() {
             }
             
             // Handle drag end
-            if (leadershipMouseDownState && leadershipMouseDownState.memberIndex === memberIndex) {
-                if (leadershipMouseDownState.timeout) {
-                    clearTimeout(leadershipMouseDownState.timeout);
+            if (leadershipDragState && leadershipDragState.memberIndex === memberIndex) {
+                const start = Math.min(leadershipDragState.startMinutes, leadershipDragState.currentMinutes);
+                const end = Math.max(leadershipDragState.startMinutes, leadershipDragState.currentMinutes);
+                const duration = end - start;
+                
+                // Always show modal if there's a duration, or if it was a quick click
+                if (duration > 0 || !leadershipDragState.isDragging) {
+                    const finalStart = leadershipDragState.isDragging ? start : leadershipDragState.startMinutes;
+                    const finalEnd = leadershipDragState.isDragging ? end : (leadershipDragState.startMinutes + 30);
+                    showLeadershipClientModal(memberIndex, finalStart, finalEnd);
                 }
                 
-                if (leadershipDragState && leadershipDragState.memberIndex === memberIndex && leadershipDragState.isDragging) {
-                    const start = Math.min(leadershipDragState.startMinutes, leadershipDragState.currentMinutes);
-                    const end = Math.max(leadershipDragState.startMinutes, leadershipDragState.currentMinutes);
-                    const duration = end - start;
-                    if (duration > 0 && Date.now() - leadershipMouseDownState.time > 100) {
-                        showLeadershipClientModal(memberIndex, start, end);
-                    }
-                    leadershipDragState = null;
-                    document.querySelectorAll('.leadership-hour-cell').forEach(cell => {
-                        cell.classList.remove('leadership-dragging');
-                        cell.style.backgroundColor = '';
-                    });
-                } else if (Date.now() - leadershipMouseDownState.time < 100) {
-                    // Quick click - create 30 minute entry
-                    const start = leadershipMouseDownState.startMinutes;
-                    showLeadershipClientModal(memberIndex, start, start + 30);
-                }
+                // Cleanup
+                leadershipDragState = null;
                 leadershipMouseDownState = null;
-                document.removeEventListener('mousemove', handleMouseMove);
-                document.removeEventListener('mouseup', handleMouseUp);
+                document.querySelectorAll('.leadership-hour-cell').forEach(cell => {
+                    cell.classList.remove('leadership-dragging');
+                    cell.style.backgroundColor = '';
+                });
                 memberColumn.style.cursor = '';
                 memberColumn.style.backgroundColor = '';
+                document.removeEventListener('mousemove', handleMouseMove);
+                document.removeEventListener('mouseup', handleMouseUp);
             }
         };
         
-        memberColumn.addEventListener('mousemove', handleMouseMove);
-        
-        // Store handlers for cleanup
-        memberColumn._leadershipMouseMove = handleMouseMove;
-        memberColumn._leadershipMouseUp = handleMouseUp;
-        
-        // Add document-level listeners when drag starts
-        memberColumn.addEventListener('mousedown', () => {
-            document.addEventListener('mousemove', handleMouseMove);
-            document.addEventListener('mouseup', handleMouseUp);
-        }, { once: true });
+        // Add document-level listeners when mousedown happens
+        memberColumn.addEventListener('mousedown', (e) => {
+            // Only add if it's not a resize or entry click
+            if (!e.target.classList.contains('leadership-time-entry-resize-handle') && 
+                !e.target.closest('.leadership-time-entry')) {
+                document.addEventListener('mousemove', handleMouseMove);
+                document.addEventListener('mouseup', handleMouseUp, { once: true });
+            }
+        });
         
         // Handle mouse leave to clean up resize
         memberColumn.addEventListener('mouseleave', () => {

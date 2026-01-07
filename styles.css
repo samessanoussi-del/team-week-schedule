@@ -521,6 +521,50 @@ body.bright-theme .mode-indicator.admin {
     background: rgba(255,255,255,0.1);
 }
 
+.btn-leadership {
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.5);
+    color: white;
+    padding: 0.5rem 1rem;
+    height: 2rem;
+    border-radius: 2px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    white-space: nowrap;
+}
+
+.btn-leadership:hover {
+    border-color: rgba(255,255,255,0.8);
+    background: rgba(255,255,255,0.1);
+}
+
+.btn-leadership.active {
+    background: rgba(40, 167, 69, 0.3);
+    border-color: rgba(40, 167, 69, 0.5);
+    color: #4ade80;
+}
+
+body.bright-theme .btn-leadership {
+    border-color: rgba(0,0,0,0.3);
+    color: var(--bright-text);
+}
+
+body.bright-theme .btn-leadership:hover {
+    border-color: rgba(0,0,0,0.5);
+    background: rgba(0,0,0,0.05);
+}
+
+body.bright-theme .btn-leadership.active {
+    background: rgba(40, 167, 69, 0.2);
+    border-color: rgba(40, 167, 69, 0.4);
+    color: #28a745;
+}
+
 /* Main Content */
 .main-content {
     display: flex;
@@ -1957,5 +2001,199 @@ body.bright-theme .hours-label {
 .diff-badge.ontarget {
     background: rgba(77, 171, 247, 0.2);
     color: #4dabf7;
+}
+
+/* Leadership Mode */
+.leadership-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: auto;
+    background: var(--dark-bg);
+}
+
+body.bright-theme .leadership-container {
+    background: var(--bright-bg);
+}
+
+.leadership-header {
+    display: flex;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    min-width: 0;
+    background: var(--dark-sidebar);
+    border-bottom: 2px solid var(--dark-border);
+}
+
+body.bright-theme .leadership-header {
+    background: var(--bright-sidebar);
+    border-bottom-color: var(--bright-border);
+}
+
+.leadership-time-header {
+    width: 100px;
+    min-width: 100px;
+    flex-shrink: 0;
+    border-right: 2px solid var(--dark-border);
+    padding: 1rem;
+    font-weight: 600;
+    color: var(--dark-primary);
+    box-sizing: border-box;
+}
+
+body.bright-theme .leadership-time-header {
+    border-right-color: var(--bright-border);
+    color: var(--bright-primary);
+}
+
+.leadership-members-header {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    overflow-x: auto;
+}
+
+.leadership-member-header {
+    min-width: 200px;
+    width: 200px;
+    flex-shrink: 0;
+    padding: 1rem;
+    text-align: center;
+    font-weight: 600;
+    border-right: 1px solid var(--dark-border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    box-sizing: border-box;
+}
+
+body.bright-theme .leadership-member-header {
+    border-right-color: var(--bright-border);
+}
+
+.leadership-body {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+}
+
+.leadership-time-column {
+    width: 100px;
+    min-width: 100px;
+    flex-shrink: 0;
+    border-right: 2px solid var(--dark-border);
+    box-sizing: border-box;
+}
+
+body.bright-theme .leadership-time-column {
+    border-right-color: var(--bright-border);
+}
+
+.leadership-hour-slot {
+    height: 60px;
+    border-bottom: 1px solid var(--dark-border);
+    padding: 0.5rem;
+    font-size: 0.85rem;
+    color: var(--dark-text);
+    display: flex;
+    align-items: center;
+    box-sizing: border-box;
+}
+
+body.bright-theme .leadership-hour-slot {
+    border-bottom-color: var(--bright-border);
+    color: var(--bright-text);
+}
+
+.leadership-grid {
+    flex: 1;
+    display: flex;
+    min-width: 0;
+    overflow-x: auto;
+}
+
+.leadership-member-column {
+    min-width: 200px;
+    width: 200px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--dark-border);
+    position: relative;
+}
+
+body.bright-theme .leadership-member-column {
+    border-right-color: var(--bright-border);
+}
+
+.leadership-hour-cell {
+    height: 60px;
+    border-bottom: 1px solid var(--dark-border);
+    position: relative;
+    cursor: pointer;
+    box-sizing: border-box;
+}
+
+body.bright-theme .leadership-hour-cell {
+    border-bottom-color: var(--bright-border);
+}
+
+.leadership-hour-cell:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+body.bright-theme .leadership-hour-cell:hover {
+    background: rgba(0, 0, 0, 0.02);
+}
+
+.leadership-time-entry {
+    position: absolute;
+    left: 2px;
+    right: 2px;
+    border-radius: 4px;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: white;
+    cursor: pointer;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    z-index: 2;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.25rem;
+}
+
+.leadership-time-entry:hover {
+    opacity: 0.9;
+}
+
+.leadership-time-entry-delete {
+    background: rgba(0, 0, 0, 0.3);
+    border: none;
+    color: white;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 0.7rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    padding: 0;
+    line-height: 1;
+}
+
+.leadership-time-entry-delete:hover {
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.leadership-dragging {
+    opacity: 0.5;
+    pointer-events: none;
 }
 

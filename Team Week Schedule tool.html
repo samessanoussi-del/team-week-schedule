@@ -19,6 +19,7 @@
                 <button id="nextWeek" class="btn-nav">Next Week →</button>
             </div>
             <div class="header-controls">
+                <button id="leadershipModeBtn" class="btn-leadership" title="Toggle Leadership Mode">👥 Leadership Mode</button>
                 <div id="modeIndicator" class="mode-indicator">View Mode</div>
                 <button id="themeToggle" class="btn-theme-toggle" title="Toggle theme">🌓</button>
                 <button id="settingsBtn" class="btn-settings" title="Settings">⚙️</button>
@@ -59,8 +60,8 @@
                 </div>
             </aside>
 
-            <!-- Calendar -->
-            <main class="calendar-container">
+            <!-- Calendar View -->
+            <main class="calendar-container" id="calendarView">
                 <div class="calendar-header">
                     <div class="time-header"></div>
                     <div class="days-header">
@@ -80,6 +81,24 @@
                     </div>
                     <div class="calendar-grid" id="calendarGrid">
                         <!-- Calendar cells will be populated here -->
+                    </div>
+                </div>
+            </main>
+
+            <!-- Leadership Mode View -->
+            <main class="leadership-container" id="leadershipView" style="display: none;">
+                <div class="leadership-header">
+                    <div class="leadership-time-header"></div>
+                    <div class="leadership-members-header" id="leadershipMembersHeader">
+                        <!-- Team member headers will be populated here -->
+                    </div>
+                </div>
+                <div class="leadership-body">
+                    <div class="leadership-time-column" id="leadershipTimeColumn">
+                        <!-- Hour-by-hour time slots will be populated here -->
+                    </div>
+                    <div class="leadership-grid" id="leadershipGrid">
+                        <!-- Time entry cells will be populated here -->
                     </div>
                 </div>
             </main>
@@ -163,6 +182,21 @@
             </div>
             <div class="modal-body">
                 <div id="clientSelectionList" class="client-selection-list">
+                    <!-- Client options will be populated here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leadership Mode Client Selection Modal -->
+    <div id="leadershipClientModal" class="modal">
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h3>Select Client for Time Entry</h3>
+                <button class="close-btn" id="closeLeadershipClientModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="leadershipClientSelectionList" class="client-selection-list">
                     <!-- Client options will be populated here -->
                 </div>
             </div>

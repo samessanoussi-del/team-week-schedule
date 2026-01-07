@@ -2019,6 +2019,18 @@ function setupEventListeners() {
     // Client modal
     document.getElementById('closeClientModal').addEventListener('click', closeClientModal);
     document.getElementById('closeMemberModal').addEventListener('click', closeMemberModal);
+    
+    // Leadership mode
+    const leadershipBtn = document.getElementById('leadershipModeBtn');
+    if (leadershipBtn) {
+        leadershipBtn.addEventListener('click', toggleLeadershipMode);
+    }
+    
+    // Leadership client modal
+    const closeLeadershipClientModalBtn = document.getElementById('closeLeadershipClientModal');
+    if (closeLeadershipClientModalBtn) {
+        closeLeadershipClientModalBtn.addEventListener('click', closeLeadershipClientModal);
+    }
 
     // Close modals on outside click
     window.addEventListener('click', (e) => {
@@ -2035,6 +2047,10 @@ function setupEventListeners() {
         const memberModal = document.getElementById('memberModal');
         if (e.target === memberModal) {
             closeMemberModal();
+        }
+        const leadershipClientModal = document.getElementById('leadershipClientModal');
+        if (e.target === leadershipClientModal) {
+            closeLeadershipClientModal();
         }
         if (e.target === adminModal) {
             adminModal.classList.remove('show');
@@ -2114,6 +2130,9 @@ function setupEventListeners() {
         updateDayHeaders();
         updateStats();
         renderTimeTracking();
+        if (isLeadershipMode) {
+            renderLeadershipMode();
+        }
     });
 
     document.getElementById('nextWeek').addEventListener('click', () => {
@@ -2125,6 +2144,9 @@ function setupEventListeners() {
         updateDayHeaders();
         updateStats();
         renderTimeTracking();
+        if (isLeadershipMode) {
+            renderLeadershipMode();
+        }
     });
 
     // Enter key support for inputs
@@ -2657,4 +2679,394 @@ function applyViewModeRestrictions() {
     // Apply admin mode class to body
     applyAdminModeClass();
 }
+
+// Leadership Mode
+let isLeadershipMode = false;
+let leadershipDragState = null; // { memberIndex, startHour, startY, currentHour }
+
+// Toggle leadership mode
+function toggleLeadershipMode() {
+    isLeadershipMode = !isLeadershipMode;
+    const calendarView = document.getElementById('calendarView');
+    const leadershipView = document.getElementById('leadershipView');
+    const leadershipBtn = document.getElementById('leadershipModeBtn');
+    
+    if (isLeadershipMode) {
+        calendarView.style.display = 'none';
+        leadershipView.style.display = 'flex';
+        leadershipBtn.classList.add('active');
+        renderLeadershipMode();
+    } else {
+        calendarView.style.display = 'flex';
+        leadershipView.style.display = 'none';
+        leadershipBtn.classList.remove('active');
+    }
+}
+
+// Render leadership mode view
+function renderLeadershipMode() {
+    if (!isLeadershipMode) return;
+    
+    const membersHeader = document.getElementById('leadershipMembersHeader');
+    const timeColumn = document.getElementById('leadershipTimeColumn');
+    const grid = document.getElementById('leadershipGrid');
+    
+    // Clear existing content
+    membersHeader.innerHTML = '';
+    timeColumn.innerHTML = '';
+    grid.innerHTML = '';
+    
+    // Generate hour-by-hour time slots (8 AM to 8 PM)
+    const hours = [];
+    for (let h = 8; h <= 20; h++) {
+        const hour12 = h > 12 ? h - 12 : h;
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        const hourStr = `${hour12}:00 ${ampm}`;
+        hours.push({ hour: h, display: hourStr });
+    }
+    
+    // Render time column
+    hours.forEach(({ hour, display }) => {
+        const timeSlot = document.createElement('div');
+        timeSlot.className = 'leadership-hour-slot';
+        timeSlot.textContent = display;
+        timeColumn.appendChild(timeSlot);
+    });
+    
+    // Render member headers and columns
+    teamMembers.forEach((member, memberIndex) => {
+        // Header
+        const memberHeader = document.createElement('div');
+        memberHeader.className = 'leadership-member-header';
+        const profileDisplay = member.profilePicture ? 
+            `<img src="${member.profilePicture}" alt="${member.name}" class="draggable-item-profile circular" style="background-color: ${member.color}; width: 30px; height: 30px; object-fit: cover; border-radius: 50%;">` :
+            `<div class="draggable-item-profile circular" style="background-color: ${member.color}; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; color: ${getContrastTextColor(member.color)}; font-weight: bold; font-size: 0.9rem;">${member.name.charAt(0).toUpperCase()}</div>`;
+        memberHeader.innerHTML = `${profileDisplay}<span>${member.name}</span>`;
+        membersHeader.appendChild(memberHeader);
+        
+        // Column
+        const memberColumn = document.createElement('div');
+        memberColumn.className = 'leadership-member-column';
+        memberColumn.dataset.memberIndex = memberIndex;
+        
+        // Create hour cells
+        hours.forEach(({ hour }) => {
+            const hourCell = document.createElement('div');
+            hourCell.className = 'leadership-hour-cell';
+            hourCell.dataset.memberIndex = memberIndex;
+            hourCell.dataset.hour = hour;
+            
+            // Add click and hold functionality
+            let mouseDownTime = null;
+            let mouseDownY = null;
+            let dragTimeout = null;
+            
+            hourCell.addEventListener('mousedown', (e) => {
+                if (!isAdminMode) return;
+                e.preventDefault();
+                mouseDownTime = Date.now();
+                mouseDownY = e.clientY;
+                hourCell.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                
+                // Start drag after 100ms hold
+                dragTimeout = setTimeout(() => {
+                    leadershipDragState = {
+                        memberIndex: memberIndex,
+                        startHour: hour,
+                        startY: mouseDownY,
+                        currentHour: hour
+                    };
+                    hourCell.classList.add('leadership-dragging');
+                }, 100);
+            });
+            
+            // Handle mousemove on the column for better drag experience
+            memberColumn.addEventListener('mousemove', (e) => {
+                if (leadershipDragState && leadershipDragState.memberIndex === memberIndex) {
+                    const cellHeight = 60;
+                    const columnRect = memberColumn.getBoundingClientRect();
+                    const relativeY = e.clientY - columnRect.top;
+                    const hoursFromTop = Math.floor(relativeY / cellHeight);
+                    const newHour = Math.max(8, Math.min(20, 8 + hoursFromTop));
+                    
+                    if (newHour !== leadershipDragState.currentHour) {
+                        leadershipDragState.currentHour = newHour;
+                        updateLeadershipDragPreview();
+                    }
+                }
+            });
+            
+            hourCell.addEventListener('mouseup', (e) => {
+                if (dragTimeout) {
+                    clearTimeout(dragTimeout);
+                    dragTimeout = null;
+                }
+                
+                if (leadershipDragState && leadershipDragState.memberIndex === memberIndex) {
+                    const start = Math.min(leadershipDragState.startHour, leadershipDragState.currentHour);
+                    const end = Math.max(leadershipDragState.startHour, leadershipDragState.currentHour);
+                    const duration = end - start + 1;
+                    if (duration > 0 && mouseDownTime && Date.now() - mouseDownTime > 100) {
+                        showLeadershipClientModal(memberIndex, start, end);
+                    }
+                    leadershipDragState = null;
+                    hourCell.classList.remove('leadership-dragging');
+                    hourCell.style.backgroundColor = '';
+                } else if (mouseDownTime && Date.now() - mouseDownTime < 100) {
+                    // Quick click - create 1 hour entry
+                    showLeadershipClientModal(memberIndex, hour, hour);
+                }
+                mouseDownTime = null;
+            });
+            
+            hourCell.addEventListener('mouseleave', () => {
+                if (dragTimeout) {
+                    clearTimeout(dragTimeout);
+                    dragTimeout = null;
+                }
+                if (!leadershipDragState || leadershipDragState.memberIndex !== memberIndex) {
+                    hourCell.style.backgroundColor = '';
+                }
+            });
+            
+            // Handle mouseup on column to catch releases outside cells
+            memberColumn.addEventListener('mouseup', (e) => {
+                if (leadershipDragState && leadershipDragState.memberIndex === memberIndex) {
+                    if (dragTimeout) {
+                        clearTimeout(dragTimeout);
+                        dragTimeout = null;
+                    }
+                    const start = Math.min(leadershipDragState.startHour, leadershipDragState.currentHour);
+                    const end = Math.max(leadershipDragState.startHour, leadershipDragState.currentHour);
+                    const duration = end - start + 1;
+                    if (duration > 0 && mouseDownTime && Date.now() - mouseDownTime > 100) {
+                        showLeadershipClientModal(memberIndex, start, end);
+                    }
+                    leadershipDragState = null;
+                    document.querySelectorAll('.leadership-hour-cell').forEach(cell => {
+                        cell.classList.remove('leadership-dragging');
+                        cell.style.backgroundColor = '';
+                    });
+                    mouseDownTime = null;
+                }
+            });
+            
+            // Render existing time entries for this hour
+            renderLeadershipTimeEntries(memberColumn, memberIndex, hour);
+            
+            memberColumn.appendChild(hourCell);
+        });
+        
+        grid.appendChild(memberColumn);
+    });
+    
+    // Render existing time entries
+    renderAllLeadershipTimeEntries();
+}
+
+// Update drag preview
+function updateLeadershipDragPreview() {
+    // Remove existing previews
+    document.querySelectorAll('.leadership-drag-preview').forEach(el => el.remove());
+    
+    if (!leadershipDragState) return;
+    
+    const { memberIndex, startHour, currentHour } = leadershipDragState;
+    const start = Math.min(startHour, currentHour);
+    const end = Math.max(startHour, currentHour);
+    const duration = end - start + 1;
+    
+    const memberColumn = document.querySelector(`.leadership-member-column[data-member-index="${memberIndex}"]`);
+    if (!memberColumn) return;
+    
+    const startCell = memberColumn.querySelector(`.leadership-hour-cell[data-hour="${start}"]`);
+    if (!startCell) return;
+    
+    const preview = document.createElement('div');
+    preview.className = 'leadership-time-entry leadership-drag-preview';
+    preview.style.top = '2px';
+    preview.style.height = `${duration * 60 - 4}px`;
+    preview.style.background = 'rgba(100, 200, 255, 0.5)';
+    preview.style.border = '2px dashed rgba(100, 200, 255, 0.8)';
+    preview.textContent = `${duration}h`;
+    startCell.appendChild(preview);
+}
+
+// Render time entries for a specific hour
+function renderLeadershipTimeEntries(column, memberIndex, hour) {
+    // This will be called for each hour cell
+    // We'll render all entries in renderAllLeadershipTimeEntries
+}
+
+// Render all time entries
+function renderAllLeadershipTimeEntries() {
+    // Clear existing entries
+    document.querySelectorAll('.leadership-time-entry:not(.leadership-drag-preview)').forEach(el => el.remove());
+    
+    // Get current week's days
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+    
+    days.forEach((dayName, dayIdx) => {
+        const dayDate = new Date(currentWeekStart);
+        dayDate.setDate(currentWeekStart.getDate() + dayIdx);
+        const dayDateKey = formatDateKey(dayDate, dayName);
+        
+        // Check all time blocks for this day
+        timeBlocks.forEach(block => {
+            const blockKey = `${dayDateKey}-${block.id}`;
+            const assignments = schedule[blockKey] || [];
+            
+            assignments.forEach(assignment => {
+                const memberIndex = teamMembers.findIndex(m => m.name === assignment.member);
+                if (memberIndex === -1) return;
+                
+                // Parse block times
+                const startHour = parseInt(block.startTime.split(':')[0]);
+                const endHour = parseInt(block.endTime.split(':')[0]);
+                const duration = endHour - startHour;
+                
+                // Find the member column
+                const memberColumn = document.querySelector(`.leadership-member-column[data-member-index="${memberIndex}"]`);
+                if (!memberColumn) return;
+                
+                // Find the start hour cell
+                const startCell = memberColumn.querySelector(`.leadership-hour-cell[data-hour="${startHour}"]`);
+                if (!startCell) return;
+                
+                // Check if entry already exists
+                if (startCell.querySelector('.leadership-time-entry:not(.leadership-drag-preview)')) return;
+                
+                // Create time entry
+                const entry = document.createElement('div');
+                entry.className = 'leadership-time-entry';
+                const client = clients.find(c => c.name === assignment.client);
+                entry.style.backgroundColor = client ? client.color : '#667eea';
+                entry.style.top = '2px';
+                entry.style.height = `${duration * 60 - 4}px`;
+                entry.innerHTML = `
+                    <span>${assignment.client}</span>
+                    ${isAdminMode ? '<button class="leadership-time-entry-delete" onclick="deleteLeadershipTimeEntry(event, ' + memberIndex + ', ' + startHour + ', ' + dayIdx + ', \'' + blockKey + '\')">&times;</button>' : ''}
+                `;
+                startCell.appendChild(entry);
+            });
+        });
+    });
+}
+
+// Show client selection modal for leadership mode
+function showLeadershipClientModal(memberIndex, startHour, endHour) {
+    if (!isAdminMode) return;
+    
+    const modal = document.getElementById('leadershipClientModal');
+    const clientList = document.getElementById('leadershipClientSelectionList');
+    
+    clientList.innerHTML = '';
+    
+    if (clients.length === 0) {
+        clientList.innerHTML = '<p style="text-align: center; color: #999; padding: 2rem;">No clients available. Add clients in Settings.</p>';
+    } else {
+        clients.forEach(client => {
+            const option = document.createElement('div');
+            option.className = 'client-option';
+            option.style.borderColor = client.color;
+            option.innerHTML = `
+                <div class="client-option-color" style="background-color: ${client.color}"></div>
+                <span>${client.name}</span>
+            `;
+            option.onclick = () => {
+                closeLeadershipClientModal();
+                createLeadershipTimeEntry(memberIndex, startHour, endHour, client.name);
+            };
+            clientList.appendChild(option);
+        });
+    }
+    
+    modal.classList.add('show');
+    window.leadershipPendingEntry = { memberIndex, startHour, endHour };
+}
+
+// Close leadership client modal
+function closeLeadershipClientModal() {
+    const modal = document.getElementById('leadershipClientModal');
+    modal.classList.remove('show');
+    window.leadershipPendingEntry = null;
+}
+
+// Create time entry in leadership mode
+function createLeadershipTimeEntry(memberIndex, startHour, endHour, clientName) {
+    if (!isAdminMode || !window.leadershipPendingEntry) return;
+    
+    const member = teamMembers[memberIndex];
+    if (!member) return;
+    
+    const duration = endHour - startHour + 1;
+    const startTime = `${startHour.toString().padStart(2, '0')}:00`;
+    const endTime = `${(endHour + 1).toString().padStart(2, '0')}:00`;
+    
+    // Find or create a matching time block
+    let matchingBlock = timeBlocks.find(block => {
+        const blockStart = parseInt(block.startTime.split(':')[0]);
+        const blockEnd = parseInt(block.endTime.split(':')[0]);
+        return blockStart === startHour && blockEnd === endHour;
+    });
+    
+    // If no matching block, create a temporary one for this entry
+    if (!matchingBlock) {
+        matchingBlock = {
+            id: `leadership-${startHour}-${endHour}`,
+            label: `${startTime} - ${endTime}`,
+            time: `${startTime} - ${endTime}`,
+            startTime: startTime,
+            endTime: endTime,
+            isLunch: false
+        };
+    }
+    
+    // Get current week's days - for now, add to Monday (can be enhanced)
+    const dayName = 'Monday';
+    const dayDate = new Date(currentWeekStart);
+    const dayDateKey = formatDateKey(dayDate, dayName);
+    const blockKey = `${dayDateKey}-${matchingBlock.id}`;
+    
+    if (!schedule[blockKey]) {
+        schedule[blockKey] = [];
+    }
+    
+    // Check if this exact entry already exists
+    const exists = schedule[blockKey].some(a => 
+        a.member === member.name && a.client === clientName
+    );
+    
+    if (!exists) {
+        saveStateToHistory();
+        schedule[blockKey].push({
+            member: member.name,
+            client: clientName
+        });
+        saveData();
+        renderLeadershipMode();
+        renderCalendar();
+        updateStats();
+    }
+}
+
+// Delete leadership time entry (global function for onclick)
+window.deleteLeadershipTimeEntry = function(event, memberIndex, startHour, dayIdx, blockKey) {
+    if (!isAdminMode) return;
+    event.stopPropagation();
+    
+    saveStateToHistory();
+    
+    if (schedule[blockKey] && Array.isArray(schedule[blockKey])) {
+        schedule[blockKey].splice(0, schedule[blockKey].length); // Clear all for simplicity
+        if (schedule[blockKey].length === 0) {
+            delete schedule[blockKey];
+        }
+    }
+    
+    saveData();
+    renderLeadershipMode();
+    renderCalendar();
+    updateStats();
+};
 

@@ -2577,6 +2577,52 @@ window.deleteLeadershipMember = function(index) {
     updateStats();
 };
 
+// Toggle Production Member to Leadership Members
+window.toggleProductionMemberToLeadership = function(index, include) {
+    if (!isAdminMode) return;
+    
+    const member = teamMembers[index];
+    if (!member) return;
+    
+    saveStateToHistory();
+    
+    if (include) {
+        // Add to leadership members if not already there
+        if (!leadershipMembers.find(m => m.name === member.name)) {
+            leadershipMembers.push({
+                name: member.name,
+                color: member.color,
+                profilePicture: member.profilePicture
+            });
+        }
+    } else {
+        // Remove from leadership members (but keep in production members)
+        const leadershipIndex = leadershipMembers.findIndex(m => m.name === member.name);
+        if (leadershipIndex !== -1) {
+            leadershipMembers.splice(leadershipIndex, 1);
+        }
+    }
+    
+    saveData();
+    renderSettings();
+    if (isLeadershipMode) {
+        renderLeadershipMode();
+    }
+};
+
+// Sync production member changes to leadership members if they're toggled
+function syncProductionMemberToLeadership(oldName, newMember) {
+    const leadershipIndex = leadershipMembers.findIndex(m => m.name === oldName);
+    if (leadershipIndex !== -1) {
+        // Update the leadership member with new data
+        leadershipMembers[leadershipIndex] = {
+            name: newMember.name,
+            color: newMember.color,
+            profilePicture: newMember.profilePicture
+        };
+    }
+}
+
 // Apply theme
 function applyTheme() {
     document.body.classList.toggle('dark-theme', isDarkTheme);

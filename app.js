@@ -64,6 +64,44 @@ function setupAuthListeners() {
     });
 }
 
+// Profile stored online (Supabase). Run ADD_USER_PROFILES.sql in Supabase to create the table.
+async function loadProfileFromSupabase(email) {
+    if (typeof supabase === 'undefined' || !email) return null;
+    try {
+        const { data, error } = await supabase.from('user_profiles').select('first_name, last_name, profile_picture_url, avatar_border_color').eq('email', email).maybeSingle();
+        if (error) {
+            console.warn('Profile load from Supabase:', error.message);
+            return null;
+        }
+        return data;
+    } catch (e) {
+        console.warn('Profile load error:', e);
+        return null;
+    }
+}
+
+async function saveProfileToSupabase(profile) {
+    if (typeof supabase === 'undefined' || !profile || !profile.email) return false;
+    try {
+        const { error } = await supabase.from('user_profiles').upsert({
+            email: profile.email,
+            first_name: profile.firstName || null,
+            last_name: profile.lastName || null,
+            profile_picture_url: profile.profilePictureUrl || null,
+            avatar_border_color: profile.avatarBorderColor || '#318cc3',
+            updated_at: new Date().toISOString()
+        }, { onConflict: 'email' });
+        if (error) {
+            console.error('Profile save to Supabase:', error);
+            return false;
+        }
+        return true;
+    } catch (e) {
+        console.error('Profile save error:', e);
+        return false;
+    }
+}
+
 // Undo/Redo system
 let undoHistory = [];
 let maxHistorySize = 50;
@@ -127,6 +165,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             showAuthScreen();
             setupAuthListeners();
             return;
+        }
+        const profileFromSupabase = await loadProfileFromSupabase(currentUser.email);
+        if (profileFromSupabase) {
+            currentUser.firstName = profileFromSupabase.first_name ?? currentUser.firstName;
+            currentUser.lastName = profileFromSupabase.last_name ?? currentUser.lastName;
+            currentUser.profilePictureUrl = profileFromSupabase.profile_picture_url ?? currentUser.profilePictureUrl;
+            currentUser.avatarBorderColor = profileFromSupabase.avatar_border_color ?? currentUser.avatarBorderColor;
         }
         authScreen.style.display = 'none';
         appContainer.style.display = 'block';
@@ -2236,15 +2281,14 @@ function setupEventListeners() {
         });
     }
 
-    function openProfileModal() {
+    async function openProfileModal() {
         if (currentUser) {
-            const users = JSON.parse(localStorage.getItem('teamScheduleUsers') || '{}');
-            const latest = users[currentUser.email];
-            if (latest) {
-                currentUser.profilePictureUrl = latest.profilePictureUrl || currentUser.profilePictureUrl;
-                currentUser.avatarBorderColor = latest.avatarBorderColor || currentUser.avatarBorderColor;
-                currentUser.firstName = latest.firstName ?? currentUser.firstName;
-                currentUser.lastName = latest.lastName ?? currentUser.lastName;
+            const profileFromSupabase = await loadProfileFromSupabase(currentUser.email);
+            if (profileFromSupabase) {
+                currentUser.firstName = profileFromSupabase.first_name ?? currentUser.firstName;
+                currentUser.lastName = profileFromSupabase.last_name ?? currentUser.lastName;
+                currentUser.profilePictureUrl = profileFromSupabase.profile_picture_url ?? currentUser.profilePictureUrl;
+                currentUser.avatarBorderColor = profileFromSupabase.avatar_border_color ?? currentUser.avatarBorderColor;
             }
             document.getElementById('profileFirstName').value = currentUser.firstName || '';
             document.getElementById('profileLastName').value = currentUser.lastName || '';
@@ -2265,7 +2309,7 @@ function setupEventListeners() {
         }
         document.getElementById('profileModal').classList.add('show');
     }
-    function saveProfileAndClose() {
+    async function saveProfileAndClose() {
         if (!currentUser) return;
         const firstName = (document.getElementById('profileFirstName') || {}).value.trim();
         const lastName = (document.getElementById('profileLastName') || {}).value.trim();
@@ -2275,6 +2319,18 @@ function setupEventListeners() {
         currentUser.firstName = firstName;
         currentUser.lastName = lastName;
         if (borderColorEl) currentUser.avatarBorderColor = borderColorEl.value || '#318cc3';
+        const saved = await saveProfileToSupabase({
+            email: currentUser.email,
+            firstName: currentUser.firstName,
+            lastName: currentUser.lastName,
+            profilePictureUrl: currentUser.profilePictureUrl,
+            avatarBorderColor: currentUser.avatarBorderColor
+        });
+        if (!saved) {
+            if (typeof alert !== 'undefined') alert('Could not save to server. Check connection and that the user_profiles table exists in Supabase (run ADD_USER_PROFILES.sql).');
+            return;
+        }
+        localStorage.setItem('teamScheduleUser', JSON.stringify(currentUser));
         const users = JSON.parse(localStorage.getItem('teamScheduleUsers') || '{}');
         if (users[currentUser.email]) {
             users[currentUser.email].firstName = currentUser.firstName;
@@ -2282,11 +2338,10 @@ function setupEventListeners() {
             users[currentUser.email].avatarBorderColor = currentUser.avatarBorderColor;
             users[currentUser.email].profilePictureUrl = currentUser.profilePictureUrl;
         }
-        localStorage.setItem('teamScheduleUser', JSON.stringify(currentUser));
         localStorage.setItem('teamScheduleUsers', JSON.stringify(users));
         renderOnlineUsersStrip();
         document.getElementById('profileModal').classList.remove('show');
-        if (typeof alert !== 'undefined') alert('Saved! Your profile and online avatar are updated.');
+        if (typeof alert !== 'undefined') alert('Saved! Your profile is stored online and your avatar is updated.');
     }
     const profileBtn = document.getElementById('profileBtn');
     if (profileBtn) {

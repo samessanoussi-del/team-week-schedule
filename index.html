@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Team Week Schedule</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
-    <link rel="stylesheet" href="styles.css?v=10">
+    <link rel="stylesheet" href="styles.css?v=11">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
 <body>
@@ -175,12 +175,6 @@
                                 <!-- Clients list will be populated here -->
                             </div>
                         </div>
-                        <div class="settings-section">
-                            <h3>Workblocks per Client</h3>
-                            <div id="workblocksPerClientList" class="settings-list workblocks-list">
-                                <!-- Populated by JS -->
-                            </div>
-                        </div>
                     </div>
                     <div class="settings-right-column">
                         <div class="settings-section">
@@ -194,6 +188,14 @@
                             </div>
                             <div id="timeTrackingContent" class="time-tracking-content">
                                 <!-- Time tracking will be populated here -->
+                            </div>
+                        </div>
+                    </div>
+                    <div class="settings-third-column">
+                        <div class="settings-section">
+                            <h3>Workblocks per Client</h3>
+                            <div id="workblocksPerClientList" class="settings-list workblocks-list workblocks-scroll">
+                                <!-- Populated by JS -->
                             </div>
                         </div>
                     </div>

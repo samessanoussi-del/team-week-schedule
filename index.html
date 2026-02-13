@@ -204,6 +204,25 @@
         </div>
     </div>
 
+    <!-- Client Detail Modal (deadline, project stops) -->
+    <div id="clientDetailModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="clientDetailTitle">Client Details</h2>
+                <button class="close-btn" id="closeClientDetail">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="client-detail-form">
+                    <label>Project deadline</label>
+                    <input type="date" id="clientDetailDeadline" class="input-field">
+                    <label style="margin-top: 1rem;">Project stops (e.g. Design, Animation)</label>
+                    <div id="clientDetailStopsList"></div>
+                    <button type="button" id="addClientStopBtn" class="btn-primary" style="margin-top: 0.5rem;">+ Add stop</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Profile Modal -->
     <div id="profileModal" class="modal">
         <div class="modal-content">

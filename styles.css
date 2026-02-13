@@ -784,6 +784,7 @@ body.bright-theme .time-header {
 .day-header-num span {
     display: block;
     line-height: 1;
+    padding-top: 2px;
 }
 
 .day-header-num.today-circle {

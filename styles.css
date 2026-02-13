@@ -614,7 +614,7 @@ body.bright-theme .btn-leadership.active {
 }
 
 .sidebar-content {
-    flex: 1;
+    flex: 0 0 auto;
     display: flex;
     flex-direction: column;
     min-height: 0;

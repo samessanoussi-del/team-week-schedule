@@ -114,7 +114,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     const appContainer = document.getElementById('appContainer');
     const hasAuthGate = authScreen && appContainer;
     if (hasAuthGate) {
-        currentUser = JSON.parse(localStorage.getItem('teamScheduleUser') || 'null');
+        let storedUser = JSON.parse(localStorage.getItem('teamScheduleUser') || 'null');
+        if (storedUser && storedUser.email) {
+            const users = JSON.parse(localStorage.getItem('teamScheduleUsers') || '{}');
+            const latest = users[storedUser.email];
+            if (latest) {
+                storedUser = { ...storedUser, profilePictureUrl: latest.profilePictureUrl || storedUser.profilePictureUrl, avatarBorderColor: latest.avatarBorderColor || storedUser.avatarBorderColor, firstName: latest.firstName ?? storedUser.firstName, lastName: latest.lastName ?? storedUser.lastName };
+            }
+        }
+        currentUser = storedUser;
         if (!currentUser) {
             showAuthScreen();
             setupAuthListeners();
@@ -2217,7 +2225,7 @@ function setupEventListeners() {
             const scheduleView = document.getElementById('scheduleView');
             if (sp) sp.style.display = 'none';
             if (dp) dp.style.display = 'none';
-            if (scheduleView) scheduleView.style.display = 'block';
+            if (scheduleView) scheduleView.style.display = 'flex';
         });
     }
 
@@ -2301,11 +2309,13 @@ function setupEventListeners() {
             users[currentUser.email].firstName = firstName;
             users[currentUser.email].lastName = lastName;
             users[currentUser.email].avatarBorderColor = currentUser.avatarBorderColor;
+            users[currentUser.email].profilePictureUrl = currentUser.profilePictureUrl;
         }
         localStorage.setItem('teamScheduleUser', JSON.stringify(currentUser));
         localStorage.setItem('teamScheduleUsers', JSON.stringify(users));
         renderOnlineUsersStrip();
         document.getElementById('profileModal').classList.remove('show');
+        if (typeof alert !== 'undefined') alert('Saved! Your profile and online avatar are updated.');
         });
     }
     const profileAvatarBorderColorEl = document.getElementById('profileAvatarBorderColor');
@@ -2342,13 +2352,13 @@ function setupEventListeners() {
                 const scheduleView = document.getElementById('scheduleView');
                 if (settingsPage && scheduleView) {
                     scheduleView.style.display = 'none';
-                    settingsPage.style.display = 'block';
+                    settingsPage.style.display = 'flex';
                     renderSettings();
                     renderWorkblocksPerClient();
                     renderTimeTracking();
                 } else if (dashboardPage && scheduleView) {
                     scheduleView.style.display = 'none';
-                    dashboardPage.style.display = 'block';
+                    dashboardPage.style.display = 'flex';
                     renderSettings();
                     renderWorkblocksPerClient();
                     renderTimeTracking();

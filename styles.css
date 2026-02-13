@@ -566,16 +566,25 @@ body.bright-theme .btn-leadership.active {
 }
 
 /* Main Content */
-.main-content {
+.schedule-view {
     display: flex;
+    flex-direction: column;
     flex: 1;
+    min-height: 0;
     overflow: hidden;
 }
 
-/* Sidebar */
+.main-content {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* Sidebar: scrollable members + clients, stats locked to bottom */
 .sidebar {
     width: 250px;
-    padding: 1.5rem;
+    padding: 1rem 1rem 0 1rem;
     display: flex;
     flex-direction: column;
     box-shadow: 2px 0 5px rgba(0,0,0,0.05);
@@ -589,10 +598,11 @@ body.bright-theme .btn-leadership.active {
     flex-direction: column;
     min-height: 0;
     overflow-y: auto;
+    padding-bottom: 0.5rem;
 }
 
 .menu-section {
-    margin-bottom: 2rem;
+    margin-bottom: 1rem;
     flex-shrink: 0;
 }
 
@@ -602,6 +612,7 @@ body.bright-theme .btn-leadership.active {
     flex-direction: column;
     min-height: 0;
     margin-bottom: 0;
+    overflow: hidden;
 }
 
 .clients-list {
@@ -755,6 +766,7 @@ body.bright-theme .time-header {
     justify-content: center;
     width: 1.75rem;
     height: 1.75rem;
+    line-height: 1;
     border-radius: 50%;
     font-size: 0.9rem;
     font-weight: 600;
@@ -1511,15 +1523,15 @@ body.bright-theme ::-webkit-scrollbar-thumb:hover {
     background: #aaa;
 }
 
-/* Stats Panel */
+/* Stats Panel - locked to bottom of sidebar, always visible */
 .stats-panel {
     flex-shrink: 0;
     background: var(--dark-modal);
     border: 1px solid var(--dark-border);
     border-radius: 2px;
     padding: 1rem;
-    margin-top: 1rem;
-    max-height: 400px;
+    margin: 0 0 1rem 0;
+    max-height: 280px;
     overflow-y: auto;
     box-shadow: 0 4px 12px rgba(0,0,0,0.3);
 }
@@ -2326,13 +2338,21 @@ body.bright-theme .leadership-hour-cell:hover {
     pointer-events: none;
 }
 
-/* Settings page (index) and Dashboard page (tool) */
+/* Settings page (index) and Dashboard page (tool) - use full width, scrollable */
 .settings-page,
 .dashboard-page {
-    padding: 2rem;
-    max-width: 1200px;
-    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    padding: 1.5rem 2rem 2rem;
     overflow-y: auto;
+    overflow-x: hidden;
+}
+.settings-page-body {
+    flex: 1;
+    min-width: 0;
+    margin-top: 1rem;
 }
 .settings-page-header,
 .dashboard-header {
@@ -2346,13 +2366,19 @@ body.bright-theme .leadership-hour-cell:hover {
     margin: 0;
     font-size: 1.5rem;
 }
-.settings-page-body {
-    margin-top: 1rem;
-}
 .dashboard-layout,
 .settings-layout {
     display: flex;
     gap: 2rem;
+    width: 100%;
+    max-width: 1400px;
+}
+.settings-left-column,
+.settings-right-column {
+    min-width: 0;
+}
+.settings-right-column {
+    flex: 1;
 }
 .workblocks-row {
     display: flex;

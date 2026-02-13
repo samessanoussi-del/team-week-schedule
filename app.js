@@ -110,14 +110,19 @@ function getContrastTextColor(backgroundColor) {
 // Initialize app
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('🚀 Initializing app...');
-    currentUser = JSON.parse(localStorage.getItem('teamScheduleUser') || 'null');
-    if (!currentUser) {
-        showAuthScreen();
-        setupAuthListeners();
-        return;
+    const authScreen = document.getElementById('authScreen');
+    const appContainer = document.getElementById('appContainer');
+    const hasAuthGate = authScreen && appContainer;
+    if (hasAuthGate) {
+        currentUser = JSON.parse(localStorage.getItem('teamScheduleUser') || 'null');
+        if (!currentUser) {
+            showAuthScreen();
+            setupAuthListeners();
+            return;
+        }
+        authScreen.style.display = 'none';
+        appContainer.style.display = 'block';
     }
-    document.getElementById('authScreen').style.display = 'none';
-    document.getElementById('appContainer').style.display = 'block';
     await loadData();
     initializeCalendar();
     setupEventListeners();
@@ -2186,25 +2191,32 @@ function updateTimeTracking(weekKey, memberName, clientName, hours) {
 
 // Setup event listeners
 function setupEventListeners() {
-    // Dashboard (own page)
-    document.getElementById('dashboardBtn').addEventListener('click', () => {
-        if (!isAdminMode) {
-            document.getElementById('adminModal').classList.add('show');
-        } else {
-            document.getElementById('scheduleView').style.display = 'none';
-            document.getElementById('dashboardPage').style.display = 'block';
-            renderSettings();
-            renderWorkblocksPerClient();
-            renderTimeTracking();
-        }
-    });
+    // Dashboard (own page) - only on tool page
+    const dashboardBtn = document.getElementById('dashboardBtn');
+    if (dashboardBtn) {
+        dashboardBtn.addEventListener('click', () => {
+            if (!isAdminMode) {
+                document.getElementById('adminModal').classList.add('show');
+            } else {
+                document.getElementById('scheduleView').style.display = 'none';
+                document.getElementById('dashboardPage').style.display = 'block';
+                renderSettings();
+                renderWorkblocksPerClient();
+                renderTimeTracking();
+            }
+        });
+    }
+    const backToScheduleBtn = document.getElementById('backToScheduleBtn');
+    if (backToScheduleBtn) {
+        backToScheduleBtn.addEventListener('click', () => {
+            document.getElementById('dashboardPage').style.display = 'none';
+            document.getElementById('scheduleView').style.display = 'block';
+        });
+    }
 
-    document.getElementById('backToScheduleBtn').addEventListener('click', () => {
-        document.getElementById('dashboardPage').style.display = 'none';
-        document.getElementById('scheduleView').style.display = 'block';
-    });
-
-    document.getElementById('profileBtn').addEventListener('click', () => {
+    const profileBtn = document.getElementById('profileBtn');
+    if (profileBtn) {
+        profileBtn.addEventListener('click', () => {
         if (currentUser) {
             document.getElementById('profileFirstName').value = currentUser.firstName || '';
             document.getElementById('profileLastName').value = currentUser.lastName || '';
@@ -2220,11 +2232,17 @@ function setupEventListeners() {
             }
         }
         document.getElementById('profileModal').classList.add('show');
-    });
-    document.getElementById('closeProfileModal').addEventListener('click', () => {
-        document.getElementById('profileModal').classList.remove('show');
-    });
-    document.getElementById('profilePictureInput').addEventListener('change', (e) => {
+        });
+    }
+    const closeProfileModal = document.getElementById('closeProfileModal');
+    if (closeProfileModal) {
+        closeProfileModal.addEventListener('click', () => {
+            document.getElementById('profileModal').classList.remove('show');
+        });
+    }
+    const profilePictureInput = document.getElementById('profilePictureInput');
+    if (profilePictureInput) {
+        profilePictureInput.addEventListener('change', (e) => {
         const file = e.target.files[0];
         if (file) {
             const reader = new FileReader();
@@ -2242,18 +2260,24 @@ function setupEventListeners() {
                 preview.appendChild(img);
             };
             reader.readAsDataURL(file);
-        }
-    });
-    document.getElementById('profileChangePasswordBtn').addEventListener('click', () => {
+            }
+        });
+    }
+    const profileChangePasswordBtn = document.getElementById('profileChangePasswordBtn');
+    if (profileChangePasswordBtn) {
+        profileChangePasswordBtn.addEventListener('click', () => {
         const newPass = document.getElementById('profileNewPassword').value;
         if (!newPass) return;
         const users = JSON.parse(localStorage.getItem('teamScheduleUsers') || '{}');
         if (users[currentUser.email]) users[currentUser.email].password = newPass;
         localStorage.setItem('teamScheduleUsers', JSON.stringify(users));
         document.getElementById('profileNewPassword').value = '';
-        alert('Password updated.');
-    });
-    document.getElementById('profileSaveBtn').addEventListener('click', () => {
+            alert('Password updated.');
+        });
+    }
+    const profileSaveBtn = document.getElementById('profileSaveBtn');
+    if (profileSaveBtn) {
+        profileSaveBtn.addEventListener('click', () => {
         const firstName = document.getElementById('profileFirstName').value.trim();
         const lastName = document.getElementById('profileLastName').value.trim();
         currentUser.firstName = firstName;
@@ -2266,12 +2290,38 @@ function setupEventListeners() {
         localStorage.setItem('teamScheduleUser', JSON.stringify(currentUser));
         localStorage.setItem('teamScheduleUsers', JSON.stringify(users));
         document.getElementById('profileModal').classList.remove('show');
-    });
-    document.getElementById('profileSignOutBtn').addEventListener('click', () => {
-        localStorage.removeItem('teamScheduleUser');
-        currentUser = null;
-        location.reload();
-    });
+        });
+    }
+    const profileSignOutBtn = document.getElementById('profileSignOutBtn');
+    if (profileSignOutBtn) {
+        profileSignOutBtn.addEventListener('click', () => {
+            localStorage.removeItem('teamScheduleUser');
+            currentUser = null;
+            location.reload();
+        });
+    }
+
+    // Settings modal (index.html)
+    const settingsBtn = document.getElementById('settingsBtn');
+    if (settingsBtn) {
+        settingsBtn.addEventListener('click', () => {
+            if (!isAdminMode) {
+                document.getElementById('adminModal').classList.add('show');
+            } else {
+                document.getElementById('settingsModal').classList.add('show');
+                renderSettings();
+                setTimeout(() => {
+                    const leftCol = document.querySelector('.settings-left-column');
+                    const rightCol = document.querySelector('.settings-right-column');
+                    if (leftCol && rightCol) rightCol.style.maxHeight = leftCol.offsetHeight + 'px';
+                }, 50);
+            }
+        });
+    }
+    const closeSettings = document.getElementById('closeSettings');
+    if (closeSettings) {
+        closeSettings.addEventListener('click', () => document.getElementById('settingsModal').classList.remove('show'));
+    }
 
     // Admin modal close button
     document.getElementById('closeAdminModal').addEventListener('click', () => {
@@ -2332,10 +2382,13 @@ function setupEventListeners() {
     // Client modal
     document.getElementById('closeClientModal').addEventListener('click', closeClientModal);
     document.getElementById('closeMemberModal').addEventListener('click', closeMemberModal);
-    document.getElementById('closeClientDetail').addEventListener('click', () => {
-        saveClientDetailAndClose();
-    });
-    document.getElementById('addClientStopBtn').addEventListener('click', () => {
+    const closeClientDetail = document.getElementById('closeClientDetail');
+    if (closeClientDetail) {
+        closeClientDetail.addEventListener('click', () => saveClientDetailAndClose());
+    }
+    const addClientStopBtn = document.getElementById('addClientStopBtn');
+    if (addClientStopBtn) {
+        addClientStopBtn.addEventListener('click', () => {
         const list = document.getElementById('clientDetailStopsList');
         const row = document.createElement('div');
         row.className = 'client-stop-row';
@@ -2346,8 +2399,9 @@ function setupEventListeners() {
             <button type="button" class="btn-delete client-stop-remove">×</button>
         `;
         row.querySelector('.client-stop-remove').addEventListener('click', () => row.remove());
-        list.appendChild(row);
-    });
+            list.appendChild(row);
+        });
+    }
     
     // Leadership mode
     const leadershipBtn = document.getElementById('leadershipModeBtn');
@@ -2382,7 +2436,7 @@ function setupEventListeners() {
         if (e.target === profileModal) {
             profileModal.classList.remove('show');
         }
-        if (e.target === clientDetailModal) {
+        if (clientDetailModal && e.target === clientDetailModal) {
             saveClientDetailAndClose();
         }
         if (e.target === adminModal) {

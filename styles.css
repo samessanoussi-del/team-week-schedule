@@ -433,27 +433,27 @@ body.bright-theme .client-option:hover {
 }
 
 .mode-indicator.view {
-    background: rgba(108, 117, 125, 0.3);
-    color: rgba(255, 255, 255, 0.8);
-    border: 1px solid rgba(108, 117, 125, 0.5);
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    color: white;
 }
 
 .mode-indicator.admin {
-    background: rgba(40, 167, 69, 0.3);
-    color: var(--dark-text);
-    border: 1px solid rgba(40, 167, 69, 0.5);
+    background: white;
+    color: #101110;
+    border: 1px solid rgba(255, 255, 255, 0.6);
 }
 
 body.bright-theme .mode-indicator.view {
-    background: rgba(108, 117, 125, 0.2);
-    color: rgba(255, 255, 255, 0.8);
-    border: 1px solid rgba(108, 117, 125, 0.4);
+    background: transparent;
+    border: 1px solid rgba(0, 0, 0, 0.3);
+    color: var(--bright-text);
 }
 
 body.bright-theme .mode-indicator.admin {
-    background: rgba(40, 167, 69, 0.2);
-    color: var(--dark-text);
-    border: 1px solid rgba(40, 167, 69, 0.4);
+    background: white;
+    color: #101110;
+    border: 1px solid rgba(0, 0, 0, 0.25);
 }
 
 .btn-nav {
@@ -614,18 +614,25 @@ body.bright-theme .btn-leadership.active {
 }
 
 .menu-section.clients-section {
-    flex: 1;
     display: flex;
     flex-direction: column;
     min-height: 0;
     margin-bottom: 0;
     overflow: hidden;
+    /* Cap section height so Statistics panel stays visible */
+    max-height: 26vh;
+    flex-shrink: 0;
 }
 
-.clients-list {
+/* Left sidebar Clients list: small scrollable box so stats window is visible */
+.sidebar .clients-list,
+.sidebar .draggable-list.clients-list {
     flex: 1;
     min-height: 0;
+    max-height: 20vh;
     overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
 }
 
 .menu-section h2 {

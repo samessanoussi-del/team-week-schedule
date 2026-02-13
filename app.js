@@ -1568,6 +1568,8 @@ function addDuplicateButtons() {
             });
         }
     });
+
+    if (isLeadershipMode) renderAllLeadershipTimeEntries();
 }
 
 
@@ -2259,6 +2261,7 @@ function setupEventListeners() {
                 if (dp && dp.style.display === 'flex') {
                     if (scheduleView) scheduleView.style.display = 'flex';
                     dp.style.display = 'none';
+                    showScheduleBoardView();
                     return;
                 }
                 if (scheduleView) scheduleView.style.display = 'none';
@@ -2278,6 +2281,7 @@ function setupEventListeners() {
             if (sp) sp.style.display = 'none';
             if (dp) dp.style.display = 'none';
             if (scheduleView) scheduleView.style.display = 'flex';
+            showScheduleBoardView();
         });
     }
 
@@ -2431,6 +2435,7 @@ function setupEventListeners() {
                     if (scheduleView) scheduleView.style.display = 'flex';
                     if (settingsPage) settingsPage.style.display = 'none';
                     if (dashboardPage) dashboardPage.style.display = 'none';
+                    showScheduleBoardView();
                     return;
                 }
                 if (settingsPage && scheduleView) {
@@ -3476,7 +3481,22 @@ let leadershipMouseDownState = null; // { time, y, timeout }
 let leadershipEditingEntry = null; // { entry, blockKey, assignment, memberIndex }
 let leadershipResizeState = null; // { entry, isTop, startY, startMinutes }
 
-// Toggle leadership mode (same calendar view; sidebar shows Leadership Members, same drag-to-block)
+// Show the correct schedule board: main calendar (production) or leadership-only board.
+function showScheduleBoardView() {
+    const calendarView = document.getElementById('calendarView');
+    const leadershipView = document.getElementById('leadershipView');
+    if (!calendarView || !leadershipView) return;
+    if (isLeadershipMode) {
+        calendarView.style.display = 'none';
+        leadershipView.style.display = 'flex';
+        renderLeadershipMode();
+    } else {
+        calendarView.style.display = '';
+        leadershipView.style.display = 'none';
+    }
+}
+
+// Toggle leadership mode: switches to leadership-only board (no production tasks) or back to main calendar.
 function toggleLeadershipMode() {
     isLeadershipMode = !isLeadershipMode;
     const leadershipBtn = document.getElementById('leadershipModeBtn');
@@ -3486,9 +3506,10 @@ function toggleLeadershipMode() {
     }
     renderSidebar();
     updateStats();
+    showScheduleBoardView();
 }
 
-// Legacy leadership grid view (no longer used; leadership mode uses same calendar + sidebar)
+// Leadership-only board: one column per leadership member; only their tasks are shown (no production members).
 function renderLeadershipMode() {
     if (!isLeadershipMode) return;
     

@@ -579,6 +579,7 @@ body.bright-theme .btn-leadership.active {
     display: flex;
     flex-direction: column;
     box-shadow: 2px 0 5px rgba(0,0,0,0.05);
+    min-height: 0;
     overflow: hidden;
 }
 
@@ -587,7 +588,7 @@ body.bright-theme .btn-leadership.active {
     display: flex;
     flex-direction: column;
     min-height: 0;
-    overflow: hidden;
+    overflow-y: auto;
 }
 
 .menu-section {
@@ -2325,23 +2326,31 @@ body.bright-theme .leadership-hour-cell:hover {
     pointer-events: none;
 }
 
-/* Dashboard page */
+/* Settings page (index) and Dashboard page (tool) */
+.settings-page,
 .dashboard-page {
     padding: 2rem;
     max-width: 1200px;
     margin: 0 auto;
+    overflow-y: auto;
 }
+.settings-page-header,
 .dashboard-header {
     display: flex;
     align-items: center;
     gap: 1rem;
     margin-bottom: 2rem;
 }
+.settings-page-header h1,
 .dashboard-header h1 {
     margin: 0;
     font-size: 1.5rem;
 }
-.dashboard-layout {
+.settings-page-body {
+    margin-top: 1rem;
+}
+.dashboard-layout,
+.settings-layout {
     display: flex;
     gap: 2rem;
 }
@@ -2369,15 +2378,16 @@ body.bright-theme .workblocks-row {
     align-items: center;
     gap: 4px;
     margin-right: 0.5rem;
-    min-width: 32px;
+    min-width: 40px;
 }
 .online-users-strip .online-avatar {
-    width: 28px;
-    height: 28px;
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
     object-fit: cover;
     border: 2px solid var(--dark-primary);
     background: var(--dark-sidebar);
+    box-sizing: border-box;
 }
 body.bright-theme .online-users-strip .online-avatar {
     border-color: var(--bright-primary);

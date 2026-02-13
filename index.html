@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Team Week Schedule</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
-    <link rel="stylesheet" href="styles.css?v=7">
+    <link rel="stylesheet" href="styles.css?v=8">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
 <body>
@@ -49,11 +49,12 @@
                 <div id="modeIndicator" class="mode-indicator">View Mode</div>
                 <button id="themeToggle" class="btn-theme-toggle" title="Toggle theme">🌓</button>
                 <button id="settingsBtn" class="btn-settings" title="Settings">⚙️</button>
-                <button id="profileBtn" class="btn-settings btn-profile" title="Your profile">👤 Profile</button>
+                <button id="profileBtn" class="btn-settings btn-profile" title="Your profile">👤</button>
             </div>
         </header>
 
-        <!-- Main Content -->
+        <!-- Schedule view -->
+        <div id="scheduleView" class="schedule-view">
         <div class="main-content">
             <!-- Sidebar Menu -->
             <aside class="sidebar">
@@ -133,16 +134,15 @@
         
         <!-- Watermark -->
         <div class="watermark">By Ravie</div>
-    </div>
+        </div>
 
-    <!-- Settings Modal -->
-    <div id="settingsModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Settings</h2>
-                <button class="close-btn" id="closeSettings">&times;</button>
+        <!-- Settings page (own page) -->
+        <div id="settingsPage" class="settings-page" style="display: none;">
+            <div class="settings-page-header">
+                <button id="backToScheduleBtn" class="btn-nav">← Back to Schedule</button>
+                <h1>Settings</h1>
             </div>
-            <div class="modal-body">
+            <div class="settings-page-body">
                 <div class="settings-layout">
                     <div class="settings-left-column">
                         <div class="settings-section">
@@ -215,6 +215,8 @@
                         <label>Profile picture</label>
                         <div class="profile-picture-preview-large" id="profilePicturePreview"></div>
                         <input type="file" id="profilePictureInput" accept="image/*" class="input-field">
+                        <label style="margin-top: 0.75rem; display: block;">Online avatar border color</label>
+                        <input type="color" id="profileAvatarBorderColor" value="#318cc3" class="input-field" style="height: 36px; padding: 2px; cursor: pointer;" title="Color of the ring around your avatar in the header">
                     </div>
                     <label>First name</label>
                     <input type="text" id="profileFirstName" class="input-field" placeholder="First name">

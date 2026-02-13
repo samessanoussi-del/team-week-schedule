@@ -41,7 +41,7 @@ function setupAuthListeners() {
             alert('Invalid email or password.');
             return;
         }
-        currentUser = { email: user.email, firstName: user.firstName, lastName: user.lastName, profilePictureUrl: user.profilePictureUrl };
+        currentUser = { email: user.email, firstName: user.firstName, lastName: user.lastName, profilePictureUrl: user.profilePictureUrl, avatarBorderColor: user.avatarBorderColor || '#318cc3' };
         localStorage.setItem('teamScheduleUser', JSON.stringify(currentUser));
         location.reload();
     });
@@ -56,9 +56,9 @@ function setupAuthListeners() {
             alert('An account with this email already exists. Sign in instead.');
             return;
         }
-        stored[email] = { email, firstName, lastName, password, profilePictureUrl: '' };
+        stored[email] = { email, firstName, lastName, password, profilePictureUrl: '', avatarBorderColor: '#318cc3' };
         localStorage.setItem('teamScheduleUsers', JSON.stringify(stored));
-        currentUser = { email, firstName, lastName, profilePictureUrl: '' };
+        currentUser = { email, firstName, lastName, profilePictureUrl: '', avatarBorderColor: '#318cc3' };
         localStorage.setItem('teamScheduleUser', JSON.stringify(currentUser));
         location.reload();
     });
@@ -1900,6 +1900,7 @@ function renderOnlineUsersStrip() {
     if (!strip) return;
     strip.innerHTML = '';
     if (currentUser) {
+        const borderColor = currentUser.avatarBorderColor || '#318cc3';
         const span = document.createElement('span');
         span.title = currentUser.firstName || currentUser.email || 'You';
         if (currentUser.profilePictureUrl) {
@@ -1907,6 +1908,7 @@ function renderOnlineUsersStrip() {
             img.src = currentUser.profilePictureUrl;
             img.alt = 'You';
             img.className = 'online-avatar';
+            img.style.borderColor = borderColor;
             span.appendChild(img);
         } else {
             const circle = document.createElement('div');
@@ -1914,9 +1916,10 @@ function renderOnlineUsersStrip() {
             circle.style.display = 'flex';
             circle.style.alignItems = 'center';
             circle.style.justifyContent = 'center';
-            circle.style.fontSize = '0.75rem';
+            circle.style.fontSize = '0.9rem';
             circle.style.fontWeight = '600';
             circle.style.color = 'var(--dark-text)';
+            circle.style.borderColor = borderColor;
             circle.textContent = (currentUser.firstName || currentUser.email || '?').charAt(0).toUpperCase();
             span.appendChild(circle);
         }
@@ -2209,8 +2212,12 @@ function setupEventListeners() {
     const backToScheduleBtn = document.getElementById('backToScheduleBtn');
     if (backToScheduleBtn) {
         backToScheduleBtn.addEventListener('click', () => {
-            document.getElementById('dashboardPage').style.display = 'none';
-            document.getElementById('scheduleView').style.display = 'block';
+            const sp = document.getElementById('settingsPage');
+            const dp = document.getElementById('dashboardPage');
+            const scheduleView = document.getElementById('scheduleView');
+            if (sp) sp.style.display = 'none';
+            if (dp) dp.style.display = 'none';
+            if (scheduleView) scheduleView.style.display = 'block';
         });
     }
 
@@ -2221,14 +2228,18 @@ function setupEventListeners() {
             document.getElementById('profileFirstName').value = currentUser.firstName || '';
             document.getElementById('profileLastName').value = currentUser.lastName || '';
             document.getElementById('profileNewPassword').value = '';
+            const borderColorEl = document.getElementById('profileAvatarBorderColor');
+            if (borderColorEl) borderColorEl.value = currentUser.avatarBorderColor || '#318cc3';
             const preview = document.getElementById('profilePicturePreview');
-            preview.innerHTML = '';
-            if (currentUser.profilePictureUrl) {
-                const img = document.createElement('img');
-                img.src = currentUser.profilePictureUrl;
-                img.alt = 'Profile';
-                img.style.cssText = 'width:80px;height:80px;border-radius:50%;object-fit:cover;';
-                preview.appendChild(img);
+            if (preview) {
+                preview.innerHTML = '';
+                if (currentUser.profilePictureUrl) {
+                    const img = document.createElement('img');
+                    img.src = currentUser.profilePictureUrl;
+                    img.alt = 'Profile';
+                    img.style.cssText = 'width:80px;height:80px;border-radius:50%;object-fit:cover;';
+                    preview.appendChild(img);
+                }
             }
         }
         document.getElementById('profileModal').classList.add('show');
@@ -2252,6 +2263,7 @@ function setupEventListeners() {
                 if (users[currentUser.email]) users[currentUser.email].profilePictureUrl = ev.target.result;
                 localStorage.setItem('teamScheduleUser', JSON.stringify(currentUser));
                 localStorage.setItem('teamScheduleUsers', JSON.stringify(users));
+                renderOnlineUsersStrip();
                 const preview = document.getElementById('profilePicturePreview');
                 preview.innerHTML = '';
                 const img = document.createElement('img');
@@ -2280,16 +2292,33 @@ function setupEventListeners() {
         profileSaveBtn.addEventListener('click', () => {
         const firstName = document.getElementById('profileFirstName').value.trim();
         const lastName = document.getElementById('profileLastName').value.trim();
+        const borderColorEl = document.getElementById('profileAvatarBorderColor');
         currentUser.firstName = firstName;
         currentUser.lastName = lastName;
+        if (borderColorEl) currentUser.avatarBorderColor = borderColorEl.value || '#318cc3';
         const users = JSON.parse(localStorage.getItem('teamScheduleUsers') || '{}');
         if (users[currentUser.email]) {
             users[currentUser.email].firstName = firstName;
             users[currentUser.email].lastName = lastName;
+            users[currentUser.email].avatarBorderColor = currentUser.avatarBorderColor;
         }
         localStorage.setItem('teamScheduleUser', JSON.stringify(currentUser));
         localStorage.setItem('teamScheduleUsers', JSON.stringify(users));
+        renderOnlineUsersStrip();
         document.getElementById('profileModal').classList.remove('show');
+        });
+    }
+    const profileAvatarBorderColorEl = document.getElementById('profileAvatarBorderColor');
+    if (profileAvatarBorderColorEl) {
+        profileAvatarBorderColorEl.addEventListener('input', () => {
+            if (currentUser) {
+                currentUser.avatarBorderColor = profileAvatarBorderColorEl.value;
+                const users = JSON.parse(localStorage.getItem('teamScheduleUsers') || '{}');
+                if (users[currentUser.email]) users[currentUser.email].avatarBorderColor = currentUser.avatarBorderColor;
+                localStorage.setItem('teamScheduleUser', JSON.stringify(currentUser));
+                localStorage.setItem('teamScheduleUsers', JSON.stringify(users));
+                renderOnlineUsersStrip();
+            }
         });
     }
     const profileSignOutBtn = document.getElementById('profileSignOutBtn');
@@ -2308,14 +2337,31 @@ function setupEventListeners() {
             if (!isAdminMode) {
                 document.getElementById('adminModal').classList.add('show');
             } else {
-                document.getElementById('settingsModal').classList.add('show');
-                renderSettings();
-                renderWorkblocksPerClient();
-                setTimeout(() => {
-                    const leftCol = document.querySelector('.settings-left-column');
-                    const rightCol = document.querySelector('.settings-right-column');
-                    if (leftCol && rightCol) rightCol.style.maxHeight = leftCol.offsetHeight + 'px';
-                }, 50);
+                const settingsPage = document.getElementById('settingsPage');
+                const dashboardPage = document.getElementById('dashboardPage');
+                const scheduleView = document.getElementById('scheduleView');
+                if (settingsPage && scheduleView) {
+                    scheduleView.style.display = 'none';
+                    settingsPage.style.display = 'block';
+                    renderSettings();
+                    renderWorkblocksPerClient();
+                    renderTimeTracking();
+                } else if (dashboardPage && scheduleView) {
+                    scheduleView.style.display = 'none';
+                    dashboardPage.style.display = 'block';
+                    renderSettings();
+                    renderWorkblocksPerClient();
+                    renderTimeTracking();
+                } else {
+                    document.getElementById('settingsModal').classList.add('show');
+                    renderSettings();
+                    renderWorkblocksPerClient();
+                    setTimeout(() => {
+                        const leftCol = document.querySelector('.settings-left-column');
+                        const rightCol = document.querySelector('.settings-right-column');
+                        if (leftCol && rightCol) rightCol.style.maxHeight = leftCol.offsetHeight + 'px';
+                    }, 50);
+                }
             }
         });
     }

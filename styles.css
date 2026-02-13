@@ -620,17 +620,18 @@ body.bright-theme .btn-leadership.active {
     margin-bottom: 0;
     overflow: hidden;
     /* Cap section height so Statistics panel stays visible */
-    max-height: 26vh;
+    max-height: 240px;
     flex-shrink: 0;
 }
 
 /* Left sidebar Clients list: small scrollable box so stats window is visible */
 .sidebar .clients-list,
-.sidebar .draggable-list.clients-list {
+.sidebar .draggable-list.clients-list,
+#clientsList {
     flex: 1;
     min-height: 0;
-    max-height: 20vh;
-    overflow-y: auto;
+    max-height: 200px !important;
+    overflow-y: auto !important;
     overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
 }

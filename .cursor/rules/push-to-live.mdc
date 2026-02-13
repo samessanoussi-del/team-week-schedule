@@ -18,4 +18,4 @@ git commit -m "Brief description of changes"
 git push
 ```
 
-Only push when the user has requested a change and edits were made. Do not push on purely informational or read-only requests.
+**Always** push after any code or asset changes—commit and push every time edits are made, so the live site stays in sync.

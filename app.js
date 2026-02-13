@@ -2310,6 +2310,7 @@ function setupEventListeners() {
             } else {
                 document.getElementById('settingsModal').classList.add('show');
                 renderSettings();
+                renderWorkblocksPerClient();
                 setTimeout(() => {
                     const leftCol = document.querySelector('.settings-left-column');
                     const rightCol = document.querySelector('.settings-right-column');
@@ -2420,6 +2421,10 @@ function setupEventListeners() {
         const clientModal = document.getElementById('clientModal');
         const adminModal = document.getElementById('adminModal');
         const watermarkModal = document.getElementById('watermarkModal');
+        const settingsModal = document.getElementById('settingsModal');
+        if (settingsModal && e.target === settingsModal) {
+            settingsModal.classList.remove('show');
+        }
         if (e.target === clientModal) {
             closeClientModal();
         }

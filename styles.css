@@ -120,7 +120,7 @@
     /* Dark theme colors */
     --dark-bg: #101110;
     --dark-text: #f2ebeb;
-    --dark-primary: #2563eb;
+    --dark-primary: #318cc3;
     --dark-sidebar: #1a1a1a;
     --dark-border: #333;
     --dark-hover: #2a2a2a;
@@ -129,7 +129,7 @@
     /* Bright theme colors */
     --bright-bg: #f2ebeb;
     --bright-text: #101110;
-    --bright-primary: #2563eb;
+    --bright-primary: #318cc3;
     --bright-sidebar: #ffffff;
     --bright-border: #e0e0e0;
     --bright-hover: #f5f5f5;
@@ -733,11 +733,40 @@ body.bright-theme .time-header {
 .day-header {
     flex: 1;
     min-width: 0;
-    padding: 1rem;
+    padding: 0.75rem 1rem;
     text-align: center;
     font-weight: 600;
     position: relative;
     box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.day-header-name {
+    display: block;
+}
+
+.day-header-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 50%;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.day-header-num.today-circle {
+    background: #ffc107;
+    color: #101110;
+}
+
+body.bright-theme .day-header-num.today-circle {
+    background: #ffc107;
+    color: #101110;
 }
 
 .day-header.today {
@@ -791,6 +820,13 @@ body.bright-theme .day-header.today {
 
 .time-display {
     flex: 1;
+    white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+    .time-display {
+        white-space: normal;
+    }
 }
 
 .time-slot-buttons {
@@ -2287,5 +2323,116 @@ body.bright-theme .leadership-hour-cell:hover {
 .leadership-dragging {
     opacity: 0.5;
     pointer-events: none;
+}
+
+/* Dashboard page */
+.dashboard-page {
+    padding: 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+.dashboard-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+.dashboard-header h1 {
+    margin: 0;
+    font-size: 1.5rem;
+}
+.dashboard-layout {
+    display: flex;
+    gap: 2rem;
+}
+.workblocks-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--dark-border);
+}
+body.bright-theme .workblocks-row {
+    border-bottom-color: var(--bright-border);
+}
+.muted {
+    color: #888;
+    font-size: 0.9rem;
+}
+.btn-current-week {
+    margin-left: 0.5rem;
+}
+
+/* Online users strip (Google Docs style) */
+.online-users-strip {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-right: 0.5rem;
+    min-width: 32px;
+}
+.online-users-strip .online-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--dark-primary);
+    background: var(--dark-sidebar);
+}
+body.bright-theme .online-users-strip .online-avatar {
+    border-color: var(--bright-primary);
+}
+
+/* Auth screen */
+.auth-screen {
+    position: fixed;
+    inset: 0;
+    background: var(--dark-bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+.auth-box {
+    background: var(--dark-modal);
+    border: 1px solid var(--dark-border);
+    border-radius: 12px;
+    padding: 2rem;
+    max-width: 360px;
+    width: 90%;
+}
+.auth-box h1 {
+    margin: 0 0 0.5rem;
+    font-size: 1.5rem;
+}
+.auth-subtitle {
+    color: #888;
+    margin: 0 0 1.5rem;
+    font-size: 0.9rem;
+}
+.auth-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+.auth-tab {
+    padding: 0.5rem 1rem;
+    background: transparent;
+    border: 1px solid var(--dark-border);
+    color: var(--dark-text);
+    border-radius: 6px;
+    cursor: pointer;
+}
+.auth-tab.active {
+    background: var(--dark-primary);
+    border-color: var(--dark-primary);
+}
+.auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+.auth-form .input-field {
+    padding: 0.6rem;
 }
 

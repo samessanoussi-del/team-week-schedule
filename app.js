@@ -9,6 +9,60 @@ let timeBlocks = []; // Format: [{ id: 'Work1', label: 'Work Block 1', time: '11
 let isAdminMode = false; // View mode by default
 const ADMIN_PASSWORD = 'Ravie2026';
 let weeklyTimeTracking = {}; // Format: { "2024-01-15": { "John": { "Client A": 5.5 }, ... }, ... }
+let clientDetails = {}; // Format: { "Client A": { deadline: "2025-02-20", stops: [ { name: "Design", due: "2025-02-01" }, ... ] }, ... }
+let currentUser = null; // { email, firstName, lastName, profilePictureUrl } from localStorage or Supabase Auth
+
+// Auth (localStorage-based; can be replaced with Supabase Auth)
+function showAuthScreen() {
+    document.getElementById('authScreen').style.display = 'flex';
+    document.getElementById('appContainer').style.display = 'none';
+}
+
+function setupAuthListeners() {
+    const tabs = document.querySelectorAll('.auth-tab');
+    const signInForm = document.getElementById('authSignInForm');
+    const signUpForm = document.getElementById('authSignUpForm');
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            tabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            const isSignUp = tab.dataset.tab === 'signup';
+            signInForm.style.display = isSignUp ? 'none' : 'block';
+            signUpForm.style.display = isSignUp ? 'block' : 'none';
+        });
+    });
+    signInForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const email = document.getElementById('authEmailSignIn').value.trim();
+        const password = document.getElementById('authPasswordSignIn').value;
+        const stored = JSON.parse(localStorage.getItem('teamScheduleUsers') || '{}');
+        const user = stored[email];
+        if (!user || user.password !== password) {
+            alert('Invalid email or password.');
+            return;
+        }
+        currentUser = { email: user.email, firstName: user.firstName, lastName: user.lastName, profilePictureUrl: user.profilePictureUrl };
+        localStorage.setItem('teamScheduleUser', JSON.stringify(currentUser));
+        location.reload();
+    });
+    signUpForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const firstName = document.getElementById('authFirstName').value.trim();
+        const lastName = document.getElementById('authLastName').value.trim();
+        const email = document.getElementById('authEmailSignUp').value.trim();
+        const password = document.getElementById('authPasswordSignUp').value;
+        const stored = JSON.parse(localStorage.getItem('teamScheduleUsers') || '{}');
+        if (stored[email]) {
+            alert('An account with this email already exists. Sign in instead.');
+            return;
+        }
+        stored[email] = { email, firstName, lastName, password, profilePictureUrl: '' };
+        localStorage.setItem('teamScheduleUsers', JSON.stringify(stored));
+        currentUser = { email, firstName, lastName, profilePictureUrl: '' };
+        localStorage.setItem('teamScheduleUser', JSON.stringify(currentUser));
+        location.reload();
+    });
+}
 
 // Undo/Redo system
 let undoHistory = [];
@@ -56,15 +110,25 @@ function getContrastTextColor(backgroundColor) {
 // Initialize app
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('🚀 Initializing app...');
+    currentUser = JSON.parse(localStorage.getItem('teamScheduleUser') || 'null');
+    if (!currentUser) {
+        showAuthScreen();
+        setupAuthListeners();
+        return;
+    }
+    document.getElementById('authScreen').style.display = 'none';
+    document.getElementById('appContainer').style.display = 'block';
     await loadData();
     initializeCalendar();
     setupEventListeners();
     renderSidebar();
     renderSettings();
     updateStats();
-    setupRealtimeSubscriptions();
+    // Delay realtime subscriptions to avoid first-load flicker (race with initial render)
+    setTimeout(() => setupRealtimeSubscriptions(), 1500);
     renderTimeTracking();
     updateDayHeaders();
+    renderOnlineUsersStrip();
     console.log('✅ App initialized');
     
     // Update day headers every minute to catch day changes
@@ -410,6 +474,10 @@ async function loadAppSettings() {
         if (savedTheme !== null) {
             isDarkTheme = savedTheme === 'true';
         }
+        const savedClientDetails = localStorage.getItem('clientDetails');
+        if (savedClientDetails) {
+            clientDetails = JSON.parse(savedClientDetails);
+        }
         return;
     }
     
@@ -426,6 +494,8 @@ async function loadAppSettings() {
                     timeBlocks = setting.value;
                 } else if (setting.key === 'isDarkTheme') {
                     isDarkTheme = setting.value;
+                } else if (setting.key === 'clientDetails') {
+                    clientDetails = setting.value || {};
                 }
                 // Note: currentWeekStart is NOT loaded from Supabase - it stays local per device
             });
@@ -485,6 +555,10 @@ async function loadAppSettings() {
         const savedTheme = localStorage.getItem('isDarkTheme');
         if (savedTheme !== null) {
             isDarkTheme = savedTheme === 'true';
+        }
+        const savedClientDetails = localStorage.getItem('clientDetails');
+        if (savedClientDetails) {
+            clientDetails = JSON.parse(savedClientDetails);
         }
     }
 }
@@ -902,10 +976,11 @@ async function saveWeeklyTimeTracking() {
 // Save app settings to Supabase
 async function saveAppSettings() {
     try {
-        // Only save timeBlocks and isDarkTheme to Supabase (currentWeekStart stays local)
+        // Save timeBlocks, isDarkTheme, clientDetails to Supabase (currentWeekStart stays local)
         const settings = [
             { key: 'timeBlocks', value: timeBlocks },
-            { key: 'isDarkTheme', value: isDarkTheme }
+            { key: 'isDarkTheme', value: isDarkTheme },
+            { key: 'clientDetails', value: clientDetails }
         ];
 
         for (const setting of settings) {
@@ -920,6 +995,7 @@ async function saveAppSettings() {
         // Fallback to localStorage
         localStorage.setItem('timeBlocks', JSON.stringify(timeBlocks));
         localStorage.setItem('isDarkTheme', isDarkTheme);
+        localStorage.setItem('clientDetails', JSON.stringify(clientDetails));
     }
     
     // Always save currentWeekStart to localStorage only (never to Supabase)
@@ -959,7 +1035,7 @@ function initializeCalendar() {
     updateDayHeaders();
 }
 
-// Update day headers to highlight today
+// Update day headers to show day name + date number (Google Calendar style) and highlight today
 function updateDayHeaders() {
     const dayHeaders = document.querySelectorAll('.day-header');
     const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
@@ -972,10 +1048,11 @@ function updateDayHeaders() {
         const dayDate = new Date(currentWeekStart);
         dayDate.setDate(currentWeekStart.getDate() + dayIndex);
         dayDate.setHours(0, 0, 0, 0);
+        const dayNum = dayDate.getDate();
         
-        // Check if this day is today
-        const isToday = dayDate.getTime() === today.getTime();
-        if (isToday) {
+        header.innerHTML = `<span class="day-header-name">${days[dayIndex]}</span><span class="day-header-num ${dayDate.getTime() === today.getTime() ? 'today-circle' : ''}">${dayNum}</span>`;
+        
+        if (dayDate.getTime() === today.getTime()) {
             header.classList.add('today');
         } else {
             header.classList.remove('today');
@@ -1080,7 +1157,7 @@ function renderCalendar() {
             timeBlock.className = `time-block ${block.id === 'Lunch' ? 'lunch' : 'work-block'}`;
             
             if (block.id === 'Lunch') {
-                timeBlock.textContent = 'Lunch (Unavailable)';
+                timeBlock.textContent = 'Lunch';
             } else {
                 const blockKey = `${dateKey}-${block.id}`;
                 const assignments = schedule[blockKey] || [];
@@ -1691,13 +1768,18 @@ function removeAssignment(blockKey, assignmentIndex) {
     updateStats();
 }
 
-// Render sidebar
+// Render sidebar (in leadership mode shows leadership members, same drag-to-block behaviour)
 function renderSidebar() {
     const membersList = document.getElementById('teamMembersList');
     const clientsList = document.getElementById('clientsList');
+    const membersSectionTitle = document.getElementById('membersSectionTitle');
+    const membersToShow = isLeadershipMode ? leadershipMembers : teamMembers;
 
+    if (membersSectionTitle) {
+        membersSectionTitle.textContent = isLeadershipMode ? 'Leadership Members' : 'Production Members';
+    }
     membersList.innerHTML = '';
-    teamMembers.forEach(member => {
+    membersToShow.forEach(member => {
         const item = document.createElement('div');
         item.className = 'draggable-item';
         item.draggable = isAdminMode;
@@ -1798,14 +1880,70 @@ function renderSettings() {
             </div>
             <span class="settings-item-name">${client.name}</span>
             <div class="settings-item-actions" style="${disabledStyle}">
+                <button class="btn-edit" onclick="openClientDetail(${index})" ${disabledAttr} title="Deadline & project stops">Details</button>
                 <button class="btn-edit" onclick="editClient(${index})" ${disabledAttr}>Edit</button>
                 <button class="btn-delete" onclick="deleteClient(${index})" ${disabledAttr}>Delete</button>
             </div>
         `;
         clientsList.appendChild(item);
     });
-    
-    // Time tracking is now in sidebar, not in settings
+}
+
+// Online users strip (currently shows current user; can add Supabase Presence for others)
+function renderOnlineUsersStrip() {
+    const strip = document.getElementById('onlineUsersStrip');
+    if (!strip) return;
+    strip.innerHTML = '';
+    if (currentUser) {
+        const span = document.createElement('span');
+        span.title = currentUser.firstName || currentUser.email || 'You';
+        if (currentUser.profilePictureUrl) {
+            const img = document.createElement('img');
+            img.src = currentUser.profilePictureUrl;
+            img.alt = 'You';
+            img.className = 'online-avatar';
+            span.appendChild(img);
+        } else {
+            const circle = document.createElement('div');
+            circle.className = 'online-avatar';
+            circle.style.display = 'flex';
+            circle.style.alignItems = 'center';
+            circle.style.justifyContent = 'center';
+            circle.style.fontSize = '0.75rem';
+            circle.style.fontWeight = '600';
+            circle.style.color = 'var(--dark-text)';
+            circle.textContent = (currentUser.firstName || currentUser.email || '?').charAt(0).toUpperCase();
+            span.appendChild(circle);
+        }
+        strip.appendChild(span);
+    }
+}
+
+// Count workblocks per client (for Dashboard)
+function renderWorkblocksPerClient() {
+    const workblocksList = document.getElementById('workblocksPerClientList');
+    if (!workblocksList) return;
+    const counts = {};
+    Object.keys(schedule).forEach(blockKey => {
+        const assignments = schedule[blockKey] || [];
+        assignments.forEach(a => {
+            if (a && a.client) {
+                counts[a.client] = (counts[a.client] || 0) + 1;
+            }
+        });
+    });
+    workblocksList.innerHTML = '';
+    if (Object.keys(counts).length === 0) {
+        workblocksList.innerHTML = '<p class="muted">No workblocks assigned yet.</p>';
+    } else {
+        clients.forEach(client => {
+            const n = counts[client.name] || 0;
+            const row = document.createElement('div');
+            row.className = 'workblocks-row';
+            row.innerHTML = `<span>${client.name}</span><strong>${n}</strong>`;
+            workblocksList.appendChild(row);
+        });
+    }
 }
 
 // Calculate assigned hours for a week
@@ -1890,7 +2028,7 @@ function renderTimeTracking() {
     // Update week display in time tracking
     const weekDisplay = document.getElementById('timeTrackingWeekDisplay');
     if (weekDisplay) {
-        weekDisplay.textContent = `${startStr} - ${endStr} (EST)`;
+        weekDisplay.textContent = `${startStr} - ${endStr}`;
     }
     
     // Calculate assigned hours from schedule
@@ -2048,28 +2186,91 @@ function updateTimeTracking(weekKey, memberName, clientName, hours) {
 
 // Setup event listeners
 function setupEventListeners() {
-    // Settings modal
-    document.getElementById('settingsBtn').addEventListener('click', () => {
+    // Dashboard (own page)
+    document.getElementById('dashboardBtn').addEventListener('click', () => {
         if (!isAdminMode) {
-            // Show admin login modal instead
             document.getElementById('adminModal').classList.add('show');
         } else {
-            document.getElementById('settingsModal').classList.add('show');
+            document.getElementById('scheduleView').style.display = 'none';
+            document.getElementById('dashboardPage').style.display = 'block';
             renderSettings();
-            // Constrain right column height to match left column
-            setTimeout(() => {
-                const leftCol = document.querySelector('.settings-left-column');
-                const rightCol = document.querySelector('.settings-right-column');
-                if (leftCol && rightCol) {
-                    const leftHeight = leftCol.offsetHeight;
-                    rightCol.style.maxHeight = leftHeight + 'px';
-                }
-            }, 50);
+            renderWorkblocksPerClient();
+            renderTimeTracking();
         }
     });
 
-    document.getElementById('closeSettings').addEventListener('click', () => {
-        document.getElementById('settingsModal').classList.remove('show');
+    document.getElementById('backToScheduleBtn').addEventListener('click', () => {
+        document.getElementById('dashboardPage').style.display = 'none';
+        document.getElementById('scheduleView').style.display = 'block';
+    });
+
+    document.getElementById('profileBtn').addEventListener('click', () => {
+        if (currentUser) {
+            document.getElementById('profileFirstName').value = currentUser.firstName || '';
+            document.getElementById('profileLastName').value = currentUser.lastName || '';
+            document.getElementById('profileNewPassword').value = '';
+            const preview = document.getElementById('profilePicturePreview');
+            preview.innerHTML = '';
+            if (currentUser.profilePictureUrl) {
+                const img = document.createElement('img');
+                img.src = currentUser.profilePictureUrl;
+                img.alt = 'Profile';
+                img.style.cssText = 'width:80px;height:80px;border-radius:50%;object-fit:cover;';
+                preview.appendChild(img);
+            }
+        }
+        document.getElementById('profileModal').classList.add('show');
+    });
+    document.getElementById('closeProfileModal').addEventListener('click', () => {
+        document.getElementById('profileModal').classList.remove('show');
+    });
+    document.getElementById('profilePictureInput').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                currentUser.profilePictureUrl = ev.target.result;
+                const users = JSON.parse(localStorage.getItem('teamScheduleUsers') || '{}');
+                if (users[currentUser.email]) users[currentUser.email].profilePictureUrl = ev.target.result;
+                localStorage.setItem('teamScheduleUser', JSON.stringify(currentUser));
+                localStorage.setItem('teamScheduleUsers', JSON.stringify(users));
+                const preview = document.getElementById('profilePicturePreview');
+                preview.innerHTML = '';
+                const img = document.createElement('img');
+                img.src = ev.target.result;
+                img.style.cssText = 'width:80px;height:80px;border-radius:50%;object-fit:cover;';
+                preview.appendChild(img);
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+    document.getElementById('profileChangePasswordBtn').addEventListener('click', () => {
+        const newPass = document.getElementById('profileNewPassword').value;
+        if (!newPass) return;
+        const users = JSON.parse(localStorage.getItem('teamScheduleUsers') || '{}');
+        if (users[currentUser.email]) users[currentUser.email].password = newPass;
+        localStorage.setItem('teamScheduleUsers', JSON.stringify(users));
+        document.getElementById('profileNewPassword').value = '';
+        alert('Password updated.');
+    });
+    document.getElementById('profileSaveBtn').addEventListener('click', () => {
+        const firstName = document.getElementById('profileFirstName').value.trim();
+        const lastName = document.getElementById('profileLastName').value.trim();
+        currentUser.firstName = firstName;
+        currentUser.lastName = lastName;
+        const users = JSON.parse(localStorage.getItem('teamScheduleUsers') || '{}');
+        if (users[currentUser.email]) {
+            users[currentUser.email].firstName = firstName;
+            users[currentUser.email].lastName = lastName;
+        }
+        localStorage.setItem('teamScheduleUser', JSON.stringify(currentUser));
+        localStorage.setItem('teamScheduleUsers', JSON.stringify(users));
+        document.getElementById('profileModal').classList.remove('show');
+    });
+    document.getElementById('profileSignOutBtn').addEventListener('click', () => {
+        localStorage.removeItem('teamScheduleUser');
+        currentUser = null;
+        location.reload();
     });
 
     // Admin modal close button
@@ -2131,6 +2332,22 @@ function setupEventListeners() {
     // Client modal
     document.getElementById('closeClientModal').addEventListener('click', closeClientModal);
     document.getElementById('closeMemberModal').addEventListener('click', closeMemberModal);
+    document.getElementById('closeClientDetail').addEventListener('click', () => {
+        saveClientDetailAndClose();
+    });
+    document.getElementById('addClientStopBtn').addEventListener('click', () => {
+        const list = document.getElementById('clientDetailStopsList');
+        const row = document.createElement('div');
+        row.className = 'client-stop-row';
+        row.style.cssText = 'display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem;';
+        row.innerHTML = `
+            <input type="text" class="input-field client-stop-name" placeholder="e.g. Design" style="flex:1">
+            <input type="date" class="input-field client-stop-due" placeholder="Due">
+            <button type="button" class="btn-delete client-stop-remove">×</button>
+        `;
+        row.querySelector('.client-stop-remove').addEventListener('click', () => row.remove());
+        list.appendChild(row);
+    });
     
     // Leadership mode
     const leadershipBtn = document.getElementById('leadershipModeBtn');
@@ -2146,13 +2363,9 @@ function setupEventListeners() {
 
     // Close modals on outside click
     window.addEventListener('click', (e) => {
-        const settingsModal = document.getElementById('settingsModal');
         const clientModal = document.getElementById('clientModal');
         const adminModal = document.getElementById('adminModal');
         const watermarkModal = document.getElementById('watermarkModal');
-        if (e.target === settingsModal) {
-            settingsModal.classList.remove('show');
-        }
         if (e.target === clientModal) {
             closeClientModal();
         }
@@ -2163,6 +2376,14 @@ function setupEventListeners() {
         const leadershipClientModal = document.getElementById('leadershipClientModal');
         if (e.target === leadershipClientModal) {
             closeLeadershipClientModal();
+        }
+        const profileModal = document.getElementById('profileModal');
+        const clientDetailModal = document.getElementById('clientDetailModal');
+        if (e.target === profileModal) {
+            profileModal.classList.remove('show');
+        }
+        if (e.target === clientDetailModal) {
+            saveClientDetailAndClose();
         }
         if (e.target === adminModal) {
             adminModal.classList.remove('show');
@@ -2214,7 +2435,7 @@ function setupEventListeners() {
                 saveData();
                 renderSettings();
                 if (isLeadershipMode) {
-                    renderLeadershipMode();
+                    renderSidebar(); if (isLeadershipMode) updateStats();
                 }
                 input.value = '';
             } else if (leadershipMembers.find(m => m.name === name)) {
@@ -2270,7 +2491,7 @@ function setupEventListeners() {
         updateStats();
         renderTimeTracking();
         if (isLeadershipMode) {
-            renderLeadershipMode();
+            renderSidebar(); if (isLeadershipMode) updateStats();
         }
     });
 
@@ -2284,9 +2505,25 @@ function setupEventListeners() {
         updateStats();
         renderTimeTracking();
         if (isLeadershipMode) {
-            renderLeadershipMode();
+            renderSidebar(); if (isLeadershipMode) updateStats();
         }
     });
+
+    const goToCurrentWeekBtn = document.getElementById('goToCurrentWeekBtn');
+    if (goToCurrentWeekBtn) {
+        goToCurrentWeekBtn.addEventListener('click', () => {
+            currentWeekStart = getCurrentWeekMonday();
+            localStorage.setItem('currentWeekStart', currentWeekStart.toISOString());
+            renderCalendar();
+            updateWeekDisplay();
+            updateDayHeaders();
+            updateStats();
+            renderTimeTracking();
+            if (isLeadershipMode) {
+                renderSidebar(); if (isLeadershipMode) updateStats();
+            }
+        });
+    }
 
     // Enter key support for inputs
     document.getElementById('newMemberName').addEventListener('keypress', (e) => {
@@ -2324,6 +2561,17 @@ function setupEventListeners() {
     // Time tracking is now in sidebar, so it doesn't need to sync with settings opening
 }
 
+// Get Monday of the week containing the given date
+function getCurrentWeekMonday() {
+    const today = new Date();
+    const day = today.getDay();
+    const diff = today.getDate() - day + (day === 0 ? -6 : 1);
+    const monday = new Date(today);
+    monday.setDate(diff);
+    monday.setHours(0, 0, 0, 0);
+    return monday;
+}
+
 // Update week display
 function updateWeekDisplay() {
     const weekEnd = new Date(currentWeekStart);
@@ -2333,7 +2581,15 @@ function updateWeekDisplay() {
     const startStr = currentWeekStart.toLocaleDateString('en-US', options);
     const endStr = weekEnd.toLocaleDateString('en-US', options);
     
-    document.getElementById('weekDisplay').textContent = `${startStr} - ${endStr} (EST)`;
+    document.getElementById('weekDisplay').textContent = `${startStr} - ${endStr}`;
+    
+    // Show "Today" button when viewing a week that's not the current week
+    const currentMonday = getCurrentWeekMonday();
+    const viewingCurrentWeek = currentWeekStart.getTime() === currentMonday.getTime();
+    const goBtn = document.getElementById('goToCurrentWeekBtn');
+    if (goBtn) {
+        goBtn.style.display = viewingCurrentWeek ? 'none' : 'inline-block';
+    }
 }
 
 // Update member color
@@ -2347,7 +2603,7 @@ function updateMemberColor(index, color) {
     renderCalendar();
     updateStats();
     if (isLeadershipMode) {
-        renderLeadershipMode();
+        renderSidebar(); if (isLeadershipMode) updateStats();
     }
 }
 
@@ -2365,7 +2621,7 @@ function updateMemberProfile(index, input) {
             renderSettings();
             renderCalendar();
             if (isLeadershipMode) {
-                renderLeadershipMode();
+                renderSidebar(); if (isLeadershipMode) updateStats();
             }
         };
         reader.readAsDataURL(file);
@@ -2410,7 +2666,7 @@ function editMember(index) {
         renderCalendar();
         updateStats();
         if (isLeadershipMode) {
-            renderLeadershipMode();
+            renderSidebar(); if (isLeadershipMode) updateStats();
         }
     } else if (teamMembers.find(m => m.name === newName.trim())) {
         alert('Member with this name already exists!');
@@ -2495,6 +2751,59 @@ function deleteClient(index) {
     updateStats();
 }
 
+// Client detail modal (deadline, project stops)
+let clientDetailEditingIndex = -1;
+
+function openClientDetail(clientIndex) {
+    if (!isAdminMode) return;
+    clientDetailEditingIndex = clientIndex;
+    const client = clients[clientIndex];
+    if (!client) return;
+    const details = clientDetails[client.name] || { deadline: '', stops: [] };
+    if (!details.stops || !Array.isArray(details.stops)) details.stops = [];
+    document.getElementById('clientDetailTitle').textContent = client.name + ' – Details';
+    document.getElementById('clientDetailDeadline').value = details.deadline || '';
+    renderClientDetailStops(details.stops);
+    document.getElementById('clientDetailModal').classList.add('show');
+}
+
+function renderClientDetailStops(stops) {
+    const list = document.getElementById('clientDetailStopsList');
+    list.innerHTML = '';
+    (stops || []).forEach((stop, i) => {
+        const row = document.createElement('div');
+        row.className = 'client-stop-row';
+        row.style.cssText = 'display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem;';
+        row.innerHTML = `
+            <input type="text" class="input-field client-stop-name" value="${(stop.name || '').replace(/"/g, '&quot;')}" placeholder="e.g. Design" style="flex:1">
+            <input type="date" class="input-field client-stop-due" value="${stop.due || ''}" placeholder="Due">
+            <button type="button" class="btn-delete client-stop-remove" data-index="${i}">×</button>
+        `;
+        row.querySelector('.client-stop-remove').addEventListener('click', () => row.remove());
+        list.appendChild(row);
+    });
+}
+
+function saveClientDetailAndClose() {
+    if (clientDetailEditingIndex < 0) return;
+    const client = clients[clientDetailEditingIndex];
+    if (!client) return;
+    const deadline = document.getElementById('clientDetailDeadline').value || '';
+    const stopRows = document.querySelectorAll('.client-stop-row');
+    const stops = [];
+    stopRows.forEach(row => {
+        const nameEl = row.querySelector('.client-stop-name');
+        const dueEl = row.querySelector('.client-stop-due');
+        if (nameEl && nameEl.value.trim()) {
+            stops.push({ name: nameEl.value.trim(), due: dueEl ? dueEl.value : '' });
+        }
+    });
+    clientDetails[client.name] = { deadline, stops };
+    saveAppSettings();
+    document.getElementById('clientDetailModal').classList.remove('show');
+    clientDetailEditingIndex = -1;
+}
+
 // Leadership Member functions
 window.updateLeadershipMemberColor = function(index, color) {
     if (!isAdminMode) return;
@@ -2502,7 +2811,7 @@ window.updateLeadershipMemberColor = function(index, color) {
     saveData();
     renderSettings();
     if (isLeadershipMode) {
-        renderLeadershipMode();
+        renderSidebar(); if (isLeadershipMode) updateStats();
     }
 };
 
@@ -2516,7 +2825,7 @@ window.updateLeadershipMemberProfile = function(index, input) {
             saveData();
             renderSettings();
             if (isLeadershipMode) {
-                renderLeadershipMode();
+                renderSidebar(); if (isLeadershipMode) updateStats();
             }
         };
         reader.readAsDataURL(file);
@@ -2545,7 +2854,7 @@ window.editLeadershipMember = function(index) {
         saveData();
         renderSettings();
         if (isLeadershipMode) {
-            renderLeadershipMode();
+            renderSidebar(); if (isLeadershipMode) updateStats();
         }
         updateStats();
     } else if (leadershipMembers.find(m => m.name === newName.trim())) {
@@ -2572,7 +2881,7 @@ window.deleteLeadershipMember = function(index) {
     saveData();
     renderSettings();
     if (isLeadershipMode) {
-        renderLeadershipMode();
+        renderSidebar(); if (isLeadershipMode) updateStats();
     }
     updateStats();
 };
@@ -2606,7 +2915,7 @@ window.toggleProductionMemberToLeadership = function(index, include) {
     saveData();
     renderSettings();
     if (isLeadershipMode) {
-        renderLeadershipMode();
+        renderSidebar(); if (isLeadershipMode) updateStats();
     }
 };
 
@@ -2969,28 +3278,19 @@ let leadershipMouseDownState = null; // { time, y, timeout }
 let leadershipEditingEntry = null; // { entry, blockKey, assignment, memberIndex }
 let leadershipResizeState = null; // { entry, isTop, startY, startMinutes }
 
-// Toggle leadership mode
+// Toggle leadership mode (same calendar view; sidebar shows Leadership Members, same drag-to-block)
 function toggleLeadershipMode() {
     isLeadershipMode = !isLeadershipMode;
-    const calendarView = document.getElementById('calendarView');
-    const leadershipView = document.getElementById('leadershipView');
     const leadershipBtn = document.getElementById('leadershipModeBtn');
-    
-    if (isLeadershipMode) {
-        calendarView.style.display = 'none';
-        leadershipView.style.display = 'flex';
-        leadershipBtn.textContent = '👥 Production Members';
-        leadershipBtn.classList.add('active');
-        renderLeadershipMode();
-    } else {
-        calendarView.style.display = 'flex';
-        leadershipView.style.display = 'none';
-        leadershipBtn.textContent = '👥 Leadership Members';
-        leadershipBtn.classList.remove('active');
+    if (leadershipBtn) {
+        leadershipBtn.textContent = isLeadershipMode ? '👥 Production Members' : '👥 Leadership Members';
+        leadershipBtn.classList.toggle('active', isLeadershipMode);
     }
+    renderSidebar();
+    updateStats();
 }
 
-// Render leadership mode view
+// Legacy leadership grid view (no longer used; leadership mode uses same calendar + sidebar)
 function renderLeadershipMode() {
     if (!isLeadershipMode) return;
     
@@ -3395,7 +3695,7 @@ function showLeadershipEditModal(entry) {
                 closeLeadershipClientModal();
                 assignment.client = client.name;
                 saveData();
-                renderLeadershipMode();
+                renderSidebar(); if (isLeadershipMode) updateStats();
                 renderCalendar();
                 updateStats();
             };
@@ -3468,7 +3768,7 @@ function createLeadershipTimeEntry(memberIndex, startMinutes, endMinutes, client
             client: clientName
         });
         saveData();
-        renderLeadershipMode();
+        renderSidebar(); if (isLeadershipMode) updateStats();
         renderCalendar();
         updateStats();
     }
@@ -3489,7 +3789,7 @@ window.deleteLeadershipTimeEntry = function(event, blockKey, assignmentIndex) {
     }
     
     saveData();
-    renderLeadershipMode();
+    renderSidebar(); if (isLeadershipMode) updateStats();
     renderCalendar();
     updateStats();
 };

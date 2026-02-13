@@ -136,9 +136,16 @@
     --bright-modal: #ffffff;
 }
 
+html {
+    height: 100%;
+    min-height: 100vh;
+}
+
 body {
     font-family: 'Acumin Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
     transition: background-color 0.3s, color 0.3s;
+    min-height: 100%;
+    min-height: 100vh;
 }
 
 /* Dark Theme (Default) */
@@ -373,7 +380,8 @@ body.bright-theme .client-option:hover {
 .app-container {
     display: flex;
     flex-direction: column;
-    height: 100vh;
+    min-height: 100vh;
+    height: 100%;
     overflow: hidden;
 }
 
@@ -565,11 +573,11 @@ body.bright-theme .btn-leadership.active {
     color: #28a745;
 }
 
-/* Main Content */
+/* Main Content - fill remaining height so no black bar at bottom */
 .schedule-view {
     display: flex;
     flex-direction: column;
-    flex: 1;
+    flex: 1 1 0;
     min-height: 0;
     overflow: hidden;
 }

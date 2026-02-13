@@ -139,6 +139,7 @@
 html {
     height: 100%;
     min-height: 100vh;
+    min-height: 100dvh;
 }
 
 body {
@@ -146,6 +147,8 @@ body {
     transition: background-color 0.3s, color 0.3s;
     min-height: 100%;
     min-height: 100vh;
+    min-height: 100dvh;
+    overflow: hidden;
 }
 
 /* Dark Theme (Default) */
@@ -377,9 +380,19 @@ body.bright-theme .client-option:hover {
     border-color: var(--bright-primary);
 }
 
+/* Fill entire viewport at any resolution (e.g. 2K) - no black bar */
 .app-container {
     position: fixed;
-    inset: 0;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    max-width: 100vw;
+    max-height: 100vh;
+    max-height: 100dvh;
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -573,18 +586,18 @@ body.bright-theme .btn-leadership.active {
     color: #28a745;
 }
 
-/* Main Content - fill remaining height so no black bar at bottom */
+/* Main Content - fill remaining height at any resolution */
 .schedule-view {
     display: flex;
     flex-direction: column;
-    flex: 1 1 0;
+    flex: 1 1 0%;
     min-height: 0;
     overflow: hidden;
 }
 
 .main-content {
     display: flex;
-    flex: 1;
+    flex: 1 1 0%;
     min-height: 0;
     overflow: hidden;
 }

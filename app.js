@@ -174,7 +174,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             currentUser.avatarBorderColor = profileFromSupabase.avatar_border_color ?? currentUser.avatarBorderColor;
         }
         authScreen.style.display = 'none';
-        appContainer.style.display = 'block';
+        appContainer.style.display = 'flex';
     }
     await loadData();
     initializeCalendar();

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Team Week Schedule</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
-    <link rel="stylesheet" href="styles.css?v=9">
+    <link rel="stylesheet" href="styles.css?v=10">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
 <body>
@@ -266,6 +266,8 @@
             </div>
             <div class="modal-body">
                 <div class="profile-form">
+                    <button type="button" id="profileSaveBtn" class="btn-primary profile-save-main">Save</button>
+                    <p class="profile-save-hint">Change your details below, then click Save. Your online avatar updates when you save.</p>
                     <div class="profile-picture-section">
                         <label>Profile picture</label>
                         <div class="profile-picture-preview-large" id="profilePicturePreview"></div>
@@ -277,7 +279,7 @@
                     <input type="text" id="profileFirstName" class="input-field" placeholder="First name">
                     <label>Last name</label>
                     <input type="text" id="profileLastName" class="input-field" placeholder="Last name">
-                    <button type="button" id="profileSaveBtn" class="btn-primary" style="margin-top: 0.5rem;">Save profile</button>
+                    <button type="button" id="profileSaveBtnBottom" class="btn-primary" style="margin-top: 0.5rem;">Save profile</button>
                     <hr style="margin: 1rem 0;">
                     <label>Change password</label>
                     <input type="password" id="profileNewPassword" class="input-field" placeholder="New password">

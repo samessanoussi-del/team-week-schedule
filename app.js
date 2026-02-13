@@ -1063,7 +1063,7 @@ function updateDayHeaders() {
         dayDate.setHours(0, 0, 0, 0);
         const dayNum = dayDate.getDate();
         
-        header.innerHTML = `<span class="day-header-name">${days[dayIndex]}</span><span class="day-header-num ${dayDate.getTime() === today.getTime() ? 'today-circle' : ''}">${dayNum}</span>`;
+        header.innerHTML = `<span class="day-header-name">${days[dayIndex]}</span><span class="day-header-num ${dayDate.getTime() === today.getTime() ? 'today-circle' : ''}"><span>${dayNum}</span></span>`;
         
         if (dayDate.getTime() === today.getTime()) {
             header.classList.add('today');
@@ -2209,8 +2209,15 @@ function setupEventListeners() {
             if (!isAdminMode) {
                 document.getElementById('adminModal').classList.add('show');
             } else {
-                document.getElementById('scheduleView').style.display = 'none';
-                document.getElementById('dashboardPage').style.display = 'block';
+                const dp = document.getElementById('dashboardPage');
+                const scheduleView = document.getElementById('scheduleView');
+                if (dp && dp.style.display === 'flex') {
+                    if (scheduleView) scheduleView.style.display = 'flex';
+                    dp.style.display = 'none';
+                    return;
+                }
+                if (scheduleView) scheduleView.style.display = 'none';
+                if (dp) dp.style.display = 'flex';
                 renderSettings();
                 renderWorkblocksPerClient();
                 renderTimeTracking();
@@ -2229,10 +2236,16 @@ function setupEventListeners() {
         });
     }
 
-    const profileBtn = document.getElementById('profileBtn');
-    if (profileBtn) {
-        profileBtn.addEventListener('click', () => {
+    function openProfileModal() {
         if (currentUser) {
+            const users = JSON.parse(localStorage.getItem('teamScheduleUsers') || '{}');
+            const latest = users[currentUser.email];
+            if (latest) {
+                currentUser.profilePictureUrl = latest.profilePictureUrl || currentUser.profilePictureUrl;
+                currentUser.avatarBorderColor = latest.avatarBorderColor || currentUser.avatarBorderColor;
+                currentUser.firstName = latest.firstName ?? currentUser.firstName;
+                currentUser.lastName = latest.lastName ?? currentUser.lastName;
+            }
             document.getElementById('profileFirstName').value = currentUser.firstName || '';
             document.getElementById('profileLastName').value = currentUser.lastName || '';
             document.getElementById('profileNewPassword').value = '';
@@ -2251,7 +2264,33 @@ function setupEventListeners() {
             }
         }
         document.getElementById('profileModal').classList.add('show');
-        });
+    }
+    function saveProfileAndClose() {
+        if (!currentUser) return;
+        const firstName = (document.getElementById('profileFirstName') || {}).value.trim();
+        const lastName = (document.getElementById('profileLastName') || {}).value.trim();
+        const borderColorEl = document.getElementById('profileAvatarBorderColor');
+        const previewImg = document.querySelector('#profilePicturePreview img');
+        if (previewImg && previewImg.src) currentUser.profilePictureUrl = previewImg.src;
+        currentUser.firstName = firstName;
+        currentUser.lastName = lastName;
+        if (borderColorEl) currentUser.avatarBorderColor = borderColorEl.value || '#318cc3';
+        const users = JSON.parse(localStorage.getItem('teamScheduleUsers') || '{}');
+        if (users[currentUser.email]) {
+            users[currentUser.email].firstName = currentUser.firstName;
+            users[currentUser.email].lastName = currentUser.lastName;
+            users[currentUser.email].avatarBorderColor = currentUser.avatarBorderColor;
+            users[currentUser.email].profilePictureUrl = currentUser.profilePictureUrl;
+        }
+        localStorage.setItem('teamScheduleUser', JSON.stringify(currentUser));
+        localStorage.setItem('teamScheduleUsers', JSON.stringify(users));
+        renderOnlineUsersStrip();
+        document.getElementById('profileModal').classList.remove('show');
+        if (typeof alert !== 'undefined') alert('Saved! Your profile and online avatar are updated.');
+    }
+    const profileBtn = document.getElementById('profileBtn');
+    if (profileBtn) {
+        profileBtn.addEventListener('click', openProfileModal);
     }
     const closeProfileModal = document.getElementById('closeProfileModal');
     if (closeProfileModal) {
@@ -2295,29 +2334,10 @@ function setupEventListeners() {
             alert('Password updated.');
         });
     }
-    const profileSaveBtn = document.getElementById('profileSaveBtn');
-    if (profileSaveBtn) {
-        profileSaveBtn.addEventListener('click', () => {
-        const firstName = document.getElementById('profileFirstName').value.trim();
-        const lastName = document.getElementById('profileLastName').value.trim();
-        const borderColorEl = document.getElementById('profileAvatarBorderColor');
-        currentUser.firstName = firstName;
-        currentUser.lastName = lastName;
-        if (borderColorEl) currentUser.avatarBorderColor = borderColorEl.value || '#318cc3';
-        const users = JSON.parse(localStorage.getItem('teamScheduleUsers') || '{}');
-        if (users[currentUser.email]) {
-            users[currentUser.email].firstName = firstName;
-            users[currentUser.email].lastName = lastName;
-            users[currentUser.email].avatarBorderColor = currentUser.avatarBorderColor;
-            users[currentUser.email].profilePictureUrl = currentUser.profilePictureUrl;
-        }
-        localStorage.setItem('teamScheduleUser', JSON.stringify(currentUser));
-        localStorage.setItem('teamScheduleUsers', JSON.stringify(users));
-        renderOnlineUsersStrip();
-        document.getElementById('profileModal').classList.remove('show');
-        if (typeof alert !== 'undefined') alert('Saved! Your profile and online avatar are updated.');
-        });
-    }
+    ['profileSaveBtn', 'profileSaveBtnBottom'].forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn) btn.addEventListener('click', saveProfileAndClose);
+    });
     const profileAvatarBorderColorEl = document.getElementById('profileAvatarBorderColor');
     if (profileAvatarBorderColorEl) {
         profileAvatarBorderColorEl.addEventListener('input', () => {
@@ -2350,6 +2370,14 @@ function setupEventListeners() {
                 const settingsPage = document.getElementById('settingsPage');
                 const dashboardPage = document.getElementById('dashboardPage');
                 const scheduleView = document.getElementById('scheduleView');
+                const onSettingsPage = settingsPage && settingsPage.style.display === 'flex';
+                const onDashboardPage = dashboardPage && dashboardPage.style.display === 'flex';
+                if (onSettingsPage || onDashboardPage) {
+                    if (scheduleView) scheduleView.style.display = 'flex';
+                    if (settingsPage) settingsPage.style.display = 'none';
+                    if (dashboardPage) dashboardPage.style.display = 'none';
+                    return;
+                }
                 if (settingsPage && scheduleView) {
                     scheduleView.style.display = 'none';
                     settingsPage.style.display = 'flex';

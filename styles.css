@@ -766,10 +766,17 @@ body.bright-theme .time-header {
     justify-content: center;
     width: 1.75rem;
     height: 1.75rem;
-    line-height: 1;
     border-radius: 50%;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     font-weight: 600;
+    padding: 0;
+    box-sizing: border-box;
+    line-height: 1.75rem;
+    text-align: center;
+}
+.day-header-num span {
+    display: block;
+    line-height: 1;
 }
 
 .day-header-num.today-circle {
@@ -1526,12 +1533,13 @@ body.bright-theme ::-webkit-scrollbar-thumb:hover {
 /* Stats Panel - locked to bottom of sidebar, always visible */
 .stats-panel {
     flex-shrink: 0;
+    min-height: 160px;
     background: var(--dark-modal);
     border: 1px solid var(--dark-border);
     border-radius: 2px;
     padding: 1rem;
     margin: 0 0 1rem 0;
-    max-height: 280px;
+    max-height: 320px;
     overflow-y: auto;
     box-shadow: 0 4px 12px rgba(0,0,0,0.3);
 }
@@ -2380,6 +2388,14 @@ body.bright-theme .leadership-hour-cell:hover {
 .settings-right-column {
     flex: 1;
 }
+#clientsSettingsList {
+    max-height: 280px;
+    overflow-y: auto;
+}
+#timeTrackingContent {
+    max-height: 60vh;
+    overflow-y: auto;
+}
 .workblocks-row {
     display: flex;
     justify-content: space-between;
@@ -2470,5 +2486,18 @@ body.bright-theme .online-users-strip .online-avatar {
 }
 .auth-form .input-field {
     padding: 0.6rem;
+}
+
+.profile-save-main {
+    width: 100%;
+    padding: 0.75rem 1.5rem;
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+.profile-save-hint {
+    font-size: 0.85rem;
+    color: #888;
+    margin: 0 0 1rem 0;
 }
 

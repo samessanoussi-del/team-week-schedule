@@ -120,7 +120,7 @@
     /* Dark theme colors */
     --dark-bg: #101110;
     --dark-text: #f2ebeb;
-    --dark-primary: #ce2828;
+    --dark-primary: #2563eb;
     --dark-sidebar: #1a1a1a;
     --dark-border: #333;
     --dark-hover: #2a2a2a;
@@ -129,7 +129,7 @@
     /* Bright theme colors */
     --bright-bg: #f2ebeb;
     --bright-text: #101110;
-    --bright-primary: #ce2828;
+    --bright-primary: #2563eb;
     --bright-sidebar: #ffffff;
     --bright-border: #e0e0e0;
     --bright-hover: #f5f5f5;

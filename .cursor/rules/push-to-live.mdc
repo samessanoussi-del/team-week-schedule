@@ -1,0 +1,21 @@
+---
+description: After making edits when the user asks for something, push changes to the live site (GitHub).
+alwaysApply: true
+---
+
+# Push to Live Site After Edits
+
+When the user asks for a change or feature in this project, after completing the edits:
+
+1. **Stage and commit** all changed files with a clear message (e.g. "Header blue", "Add X feature").
+2. **Push** to the remote so the live site (GitHub Pages) updates.
+
+Use the project root: `I:\My Drive\Cursor Apps\Team Week Schedule` (or the workspace path for this repo). Commands:
+
+```bash
+git add .
+git commit -m "Brief description of changes"
+git push
+```
+
+Only push when the user has requested a change and edits were made. Do not push on purely informational or read-only requests.

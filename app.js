@@ -3625,7 +3625,7 @@ function updateStats() {
             statItem.innerHTML = `
                 <div class="stat-color" style="background-color: ${color}"></div>
                 <span class="stat-name">${name}</span>
-                <span class="stat-value">${hours}h</span>
+                <span class="stat-value">${Math.round(hours)}h</span>
             `;
             personStatsDiv.appendChild(statItem);
         });
@@ -3646,7 +3646,7 @@ function updateStats() {
             statItem.innerHTML = `
                 <div class="stat-color" style="background-color: ${color}"></div>
                 <span class="stat-name">${name}</span>
-                <span class="stat-value">${hours}h</span>
+                <span class="stat-value">${Math.round(hours)}h</span>
             `;
             clientStatsDiv.appendChild(statItem);
         });

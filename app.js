@@ -2161,11 +2161,12 @@ function renderWorkblocksPerClient() {
     if (Object.keys(counts).length === 0) {
         workblocksList.innerHTML = '<p class="muted">No workblocks assigned yet.</p>';
     } else {
-        clients.forEach(client => {
-            const n = counts[client.name] || 0;
+        const entries = clients.map(client => ({ name: client.name, count: counts[client.name] || 0 }));
+        entries.sort((a, b) => b.count - a.count);
+        entries.forEach(({ name, count }) => {
             const row = document.createElement('div');
             row.className = 'workblocks-row';
-            row.innerHTML = `<span>${client.name}</span><strong>${n}</strong>`;
+            row.innerHTML = `<span>${name}</span><strong>${count}</strong>`;
             workblocksList.appendChild(row);
         });
     }

@@ -11,6 +11,7 @@ const ADMIN_PASSWORD = 'Ravie2026';
 let weeklyTimeTracking = {}; // Format: { "2024-01-15": { "John": { "Client A": 5.5 }, ... }, ... }
 let clientDetails = {}; // Format: { "Client A": { deadline: "2025-02-20", stops: [ { name: "Design", due: "2025-02-01" }, ... ] }, ... }
 let currentUser = null; // { email, firstName, lastName, profilePictureUrl } from localStorage or Supabase Auth
+let onlineUsersFromServer = []; // who is online (from online_users table)
 
 // Auth (localStorage-based; can be replaced with Supabase Auth)
 function showAuthScreen() {
@@ -118,6 +119,53 @@ async function saveProfileToSupabase(profile) {
     }
 }
 
+// Who is online: check in to online_users and fetch list for strip
+async function updateMyOnlinePresence() {
+    const client = getSupabaseClient();
+    if (!client || !currentUser || !currentUser.email) return;
+    const row = {
+        email: currentUser.email,
+        first_name: currentUser.firstName || null,
+        last_name: currentUser.lastName || null,
+        profile_picture_url: currentUser.profilePictureUrl || null,
+        avatar_border_color: currentUser.avatarBorderColor || '#318cc3',
+        last_seen_at: new Date().toISOString()
+    };
+    try {
+        const { data: existing } = await client.from('online_users').select('email').eq('email', currentUser.email).maybeSingle();
+        if (existing) {
+            await client.from('online_users').update(row).eq('email', currentUser.email);
+        } else {
+            await client.from('online_users').insert(row);
+        }
+    } catch (e) {
+        console.warn('Online presence update failed:', e);
+    }
+}
+
+async function fetchOnlineUsers() {
+    const client = getSupabaseClient();
+    if (!client) return;
+    const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+    try {
+        const { data, error } = await client.from('online_users')
+            .select('email, first_name, last_name, profile_picture_url, avatar_border_color')
+            .gte('last_seen_at', twoMinutesAgo);
+        if (!error && Array.isArray(data)) {
+            onlineUsersFromServer = data.map(r => ({
+                email: r.email,
+                firstName: r.first_name,
+                lastName: r.last_name,
+                profilePictureUrl: r.profile_picture_url || '',
+                avatarBorderColor: r.avatar_border_color || '#318cc3'
+            }));
+            renderOnlineUsersStrip();
+        }
+    } catch (e) {
+        console.warn('Fetch online users failed:', e);
+    }
+}
+
 // Undo/Redo system
 let undoHistory = [];
 let maxHistorySize = 50;
@@ -203,8 +251,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderTimeTracking();
     updateDayHeaders();
     renderOnlineUsersStrip();
+    if (currentUser) {
+        updateMyOnlinePresence();
+        fetchOnlineUsers();
+        setInterval(updateMyOnlinePresence, 30000);
+        setInterval(fetchOnlineUsers, 30000);
+    }
     console.log('✅ App initialized');
-    
+
     // Update day headers every minute to catch day changes
     setInterval(() => {
         updateDayHeaders();
@@ -1965,19 +2019,22 @@ function renderSettings() {
     });
 }
 
-// Online users strip (currently shows current user; can add Supabase Presence for others)
+// Online users strip: shows everyone currently online (from Supabase online_users), or just you
 function renderOnlineUsersStrip() {
     const strip = document.getElementById('onlineUsersStrip');
     if (!strip) return;
     strip.innerHTML = '';
-    if (currentUser) {
-        const borderColor = currentUser.avatarBorderColor || '#318cc3';
+    const list = onlineUsersFromServer.length > 0 ? onlineUsersFromServer : (currentUser ? [currentUser] : []);
+    list.forEach(user => {
+        const borderColor = user.avatarBorderColor || '#318cc3';
+        const displayName = user.firstName || user.lastName || user.email || '?';
+        const isYou = currentUser && user.email === currentUser.email;
         const span = document.createElement('span');
-        span.title = currentUser.firstName || currentUser.email || 'You';
-        if (currentUser.profilePictureUrl) {
+        span.title = isYou ? 'You' : displayName;
+        if (user.profilePictureUrl) {
             const img = document.createElement('img');
-            img.src = currentUser.profilePictureUrl;
-            img.alt = 'You';
+            img.src = user.profilePictureUrl;
+            img.alt = displayName;
             img.className = 'online-avatar';
             img.style.borderColor = borderColor;
             span.appendChild(img);
@@ -1991,11 +2048,11 @@ function renderOnlineUsersStrip() {
             circle.style.fontWeight = '600';
             circle.style.color = 'var(--dark-text)';
             circle.style.borderColor = borderColor;
-            circle.textContent = (currentUser.firstName || currentUser.email || '?').charAt(0).toUpperCase();
+            circle.textContent = (displayName).charAt(0).toUpperCase();
             span.appendChild(circle);
         }
         strip.appendChild(span);
-    }
+    });
 }
 
 // Count workblocks per client (for Dashboard)

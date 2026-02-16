@@ -25,47 +25,77 @@ function showAuthScreen() {
 }
 
 function setupAuthListeners() {
-    const tabs = document.querySelectorAll('.auth-tab');
+    const authTabs = document.getElementById('authTabs');
     const signInForm = document.getElementById('authSignInForm');
     const signUpForm = document.getElementById('authSignUpForm');
-    tabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-            tabs.forEach(t => t.classList.remove('active'));
+    if (!signInForm || !signUpForm) return;
+
+    // Tab switch: use delegation so clicks always work
+    if (authTabs) {
+        authTabs.addEventListener('click', (e) => {
+            const tab = e.target && e.target.closest && e.target.closest('.auth-tab');
+            if (!tab) return;
+            const isSignUp = tab.getAttribute('data-tab') === 'signup';
+            document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
             tab.classList.add('active');
-            const isSignUp = tab.dataset.tab === 'signup';
-            signInForm.style.display = isSignUp ? 'none' : 'block';
-            signUpForm.style.display = isSignUp ? 'block' : 'none';
+            signInForm.style.display = isSignUp ? 'none' : 'flex';
+            signUpForm.style.display = isSignUp ? 'flex' : 'none';
         });
-    });
+    }
+
     signInForm.addEventListener('submit', (e) => {
         e.preventDefault();
-        const email = document.getElementById('authEmailSignIn').value.trim();
-        const password = document.getElementById('authPasswordSignIn').value;
-        const stored = JSON.parse(localStorage.getItem('teamScheduleUsers') || '{}');
-        const user = stored[email];
-        if (!user || user.password !== password) {
-            alert('Invalid email or password.');
+        const emailEl = document.getElementById('authEmailSignIn');
+        const passwordEl = document.getElementById('authPasswordSignIn');
+        const email = (emailEl && emailEl.value || '').trim();
+        const password = passwordEl ? passwordEl.value : '';
+        if (!email) {
+            alert('Please enter your email.');
             return;
         }
-        currentUser = { email: user.email, firstName: user.firstName, lastName: user.lastName, profilePictureUrl: user.profilePictureUrl, avatarBorderColor: user.avatarBorderColor || '#318cc3' };
-        localStorage.setItem('teamScheduleUser', JSON.stringify(currentUser));
+        let stored = {};
+        try {
+            stored = JSON.parse(localStorage.getItem('teamScheduleUsers') || '{}');
+        } catch (_) {}
+        const user = stored[email];
+        if (!user || user.password !== password) {
+            alert('Invalid email or password. If you never signed up, use the Sign up tab to create an account.');
+            return;
+        }
+        currentUser = { email: user.email, firstName: user.firstName, lastName: user.lastName, profilePictureUrl: user.profilePictureUrl || '', avatarBorderColor: user.avatarBorderColor || '#318cc3' };
+        try {
+            localStorage.setItem('teamScheduleUser', JSON.stringify(currentUser));
+        } catch (_) {}
         location.reload();
     });
+
     signUpForm.addEventListener('submit', (e) => {
         e.preventDefault();
-        const firstName = document.getElementById('authFirstName').value.trim();
-        const lastName = document.getElementById('authLastName').value.trim();
-        const email = document.getElementById('authEmailSignUp').value.trim();
-        const password = document.getElementById('authPasswordSignUp').value;
-        const stored = JSON.parse(localStorage.getItem('teamScheduleUsers') || '{}');
+        const firstName = (document.getElementById('authFirstName') && document.getElementById('authFirstName').value || '').trim();
+        const lastName = (document.getElementById('authLastName') && document.getElementById('authLastName').value || '').trim();
+        const email = (document.getElementById('authEmailSignUp') && document.getElementById('authEmailSignUp').value || '').trim();
+        const password = document.getElementById('authPasswordSignUp') ? document.getElementById('authPasswordSignUp').value : '';
+        if (!email) {
+            alert('Please enter your email.');
+            return;
+        }
+        let stored = {};
+        try {
+            stored = JSON.parse(localStorage.getItem('teamScheduleUsers') || '{}');
+        } catch (_) {}
         if (stored[email]) {
             alert('An account with this email already exists. Sign in instead.');
             return;
         }
         stored[email] = { email, firstName, lastName, password, profilePictureUrl: '', avatarBorderColor: '#318cc3' };
-        localStorage.setItem('teamScheduleUsers', JSON.stringify(stored));
-        currentUser = { email, firstName, lastName, profilePictureUrl: '', avatarBorderColor: '#318cc3' };
-        localStorage.setItem('teamScheduleUser', JSON.stringify(currentUser));
+        try {
+            localStorage.setItem('teamScheduleUsers', JSON.stringify(stored));
+            currentUser = { email, firstName, lastName, profilePictureUrl: '', avatarBorderColor: '#318cc3' };
+            localStorage.setItem('teamScheduleUser', JSON.stringify(currentUser));
+        } catch (err) {
+            alert('Could not save account (e.g. private browsing). Try a different browser or allow site data.');
+            return;
+        }
         location.reload();
     });
 }

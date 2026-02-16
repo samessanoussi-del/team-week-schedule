@@ -315,6 +315,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!authScreen || !appContainer) {
             showAuth('Sign in or create an account to continue');
             if (appContainer) appContainer.style.display = 'flex';
+            setupAuthListeners();
             return;
         }
         let storedUser = null;

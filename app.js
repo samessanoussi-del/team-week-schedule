@@ -4308,16 +4308,25 @@ function createLeadershipTimeEntry(memberIndex, startMinutes, endMinutes, client
     }
 }
 
-// Delete leadership time entry (global function for onclick)
+// Delete leadership time entry (global function for onclick).
+// Removes the full section: all leadership blocks for the same member+client on that day.
 window.deleteLeadershipTimeEntry = function(event, blockKey, assignmentIndex) {
     if (!isAdminMode && !isLeadershipMode) return;
     event.stopPropagation();
+    const assignments = leadershipSchedule[blockKey];
+    if (!assignments || !assignments[assignmentIndex]) return;
+    const { member, client } = assignments[assignmentIndex];
+    const dayDateKey = blockKey.split('-leadership-')[0];
+    if (!dayDateKey) return;
     saveStateToHistory();
-    if (leadershipSchedule[blockKey] && Array.isArray(leadershipSchedule[blockKey])) {
-        leadershipSchedule[blockKey].splice(assignmentIndex, 1);
-        if (leadershipSchedule[blockKey].length === 0) {
-            delete leadershipSchedule[blockKey];
-        }
+    // Remove all leadership entries for this day + member + client (full section)
+    const prefix = dayDateKey + '-leadership-';
+    for (const key of Object.keys(leadershipSchedule)) {
+        if (!key.startsWith(prefix)) continue;
+        const arr = leadershipSchedule[key];
+        if (!Array.isArray(arr)) continue;
+        leadershipSchedule[key] = arr.filter(a => !(a.member === member && a.client === client));
+        if (leadershipSchedule[key].length === 0) delete leadershipSchedule[key];
     }
     saveData();
     renderSidebar();

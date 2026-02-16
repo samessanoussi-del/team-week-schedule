@@ -1231,12 +1231,13 @@ body.bright-theme .close-btn:hover {
 
 .settings-layout {
     display: grid;
-    grid-template-columns: 1fr minmax(200px, 280px) 1fr minmax(200px, 280px);
+    grid-template-columns: minmax(260px, 1fr) minmax(260px, 280px) minmax(320px, 1fr) minmax(220px, 280px);
     gap: 2rem;
     align-items: start;
     min-height: 0;
     height: fit-content;
     width: 100%;
+    min-width: 1160px;
 }
 
 .settings-left-column {
@@ -1250,7 +1251,7 @@ body.bright-theme .close-btn:hover {
 .settings-clients-column {
     display: flex;
     flex-direction: column;
-    min-width: 200px;
+    min-width: 260px;
     max-width: 280px;
 }
 
@@ -1258,9 +1259,11 @@ body.bright-theme .close-btn:hover {
     display: flex;
     flex-direction: column;
     min-height: 0;
+    min-width: 0;
     max-height: 100%;
     align-content: start;
-    overflow: hidden;
+    overflow-x: auto;
+    overflow-y: hidden;
 }
 
 .settings-section {
@@ -1341,6 +1344,8 @@ body.bright-theme .settings-section h3 {
     align-items: center;
     justify-content: space-between;
     padding: 0.75rem;
+    min-width: 0;
+    flex-wrap: nowrap;
     border-radius: 2px;
     border: 1px solid;
     gap: 1rem;
@@ -1446,6 +1451,7 @@ body.bright-theme .profile-picture-placeholder {
     display: flex;
     gap: 0.5rem;
     align-items: center;
+    flex-shrink: 0;
 }
 
 .leadership-toggle-label {
@@ -2397,11 +2403,11 @@ body.bright-theme .leadership-hour-cell:hover {
     min-height: 0;
     padding: 1.5rem 2rem 2rem;
     overflow-y: auto;
-    overflow-x: hidden;
+    overflow-x: auto;
 }
 .settings-page-body {
     flex: 1;
-    min-width: 0;
+    min-width: min(100%, 1200px);
     margin-top: 1rem;
 }
 .settings-page-header,
@@ -2421,23 +2427,26 @@ body.bright-theme .leadership-hour-cell:hover {
     display: flex;
     gap: 2rem;
     width: 100%;
+    min-width: 1160px;
     max-width: 1400px;
 }
-.settings-left-column,
-.settings-right-column {
-    min-width: 0;
+.settings-left-column {
+    min-width: 260px;
+    flex-shrink: 0;
 }
 .settings-clients-column {
-    min-width: 0;
-    min-width: 200px;
+    min-width: 260px;
     max-width: 280px;
+    flex-shrink: 0;
 }
 .settings-right-column {
+    min-width: 320px;
     flex: 1;
 }
 .settings-third-column {
-    min-width: 200px;
+    min-width: 220px;
     max-width: 280px;
+    flex-shrink: 0;
     display: flex;
     flex-direction: column;
 }

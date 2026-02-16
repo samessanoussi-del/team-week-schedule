@@ -28,6 +28,9 @@ function setupAuthListeners() {
     const authTabs = document.getElementById('authTabs');
     const signInForm = document.getElementById('authSignInForm');
     const signUpForm = document.getElementById('authSignUpForm');
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/ec7ef1a8-7389-4213-a659-4b03335bac18',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:setupAuthListeners',message:'entry',data:{hasAuthTabs:!!authTabs,hasSignInForm:!!signInForm,hasSignUpForm:!!signUpForm},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{});
+    // #endregion
     if (!signInForm || !signUpForm) return;
 
     // Tab switch: use delegation so clicks always work
@@ -35,6 +38,9 @@ function setupAuthListeners() {
         authTabs.addEventListener('click', (e) => {
             const tab = e.target && e.target.closest && e.target.closest('.auth-tab');
             if (!tab) return;
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/ec7ef1a8-7389-4213-a659-4b03335bac18',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:authTabClick',message:'tab clicked',data:{dataTab:tab.getAttribute('data-tab')},timestamp:Date.now(),hypothesisId:'H5'})}).catch(()=>{});
+            // #endregion
             const isSignUp = tab.getAttribute('data-tab') === 'signup';
             document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
             tab.classList.add('active');
@@ -44,6 +50,9 @@ function setupAuthListeners() {
     }
 
     signInForm.addEventListener('submit', (e) => {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/ec7ef1a8-7389-4213-a659-4b03335bac18',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:signInSubmit',message:'sign-in submit fired',data:{},timestamp:Date.now(),hypothesisId:'H3'})}).catch(()=>{});
+        // #endregion
         e.preventDefault();
         const emailEl = document.getElementById('authEmailSignIn');
         const passwordEl = document.getElementById('authPasswordSignIn');
@@ -70,6 +79,9 @@ function setupAuthListeners() {
     });
 
     signUpForm.addEventListener('submit', (e) => {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/ec7ef1a8-7389-4213-a659-4b03335bac18',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:signUpSubmit',message:'sign-up submit fired',data:{},timestamp:Date.now(),hypothesisId:'H3'})}).catch(()=>{});
+        // #endregion
         e.preventDefault();
         const firstName = (document.getElementById('authFirstName') && document.getElementById('authFirstName').value || '').trim();
         const lastName = (document.getElementById('authLastName') && document.getElementById('authLastName').value || '').trim();
@@ -320,6 +332,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         currentUser = storedUser;
         if (!currentUser || !currentUser.email) {
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/ec7ef1a8-7389-4213-a659-4b03335bac18',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:init',message:'calling setupAuthListeners',data:{hasCurrentUser:!!currentUser,hasEmail:!!(currentUser&&currentUser.email)},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{});
+            // #endregion
             setupAuthListeners();
             return;
         }

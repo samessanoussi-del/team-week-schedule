@@ -3548,9 +3548,12 @@ function updateStats() {
     // Calculate hours per block dynamically from timeBlocks
     const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
     
-    // Initialize counters
+    // Initialize counters (production + leadership members for person hours)
     teamMembers.forEach(member => {
         personHours[member.name] = 0;
+    });
+    leadershipMembers.forEach(member => {
+        if (!personHours.hasOwnProperty(member.name)) personHours[member.name] = 0;
     });
     
     clients.forEach(client => {
@@ -3585,11 +3588,7 @@ function updateStats() {
         });
     });
 
-    // Leadership hours from leadershipSchedule only
-    const leadershipPersonHours = {};
-    const leadershipClientHours = {};
-    leadershipMembers.forEach(m => { leadershipPersonHours[m.name] = 0; });
-    clients.forEach(c => { leadershipClientHours[c.name] = 0; });
+    // Leadership hours from leadershipSchedule: merge into personHours and clientHours
     Object.keys(leadershipSchedule).forEach((key) => {
         const parts = key.split('-leadership-');
         if (parts.length < 2) return;
@@ -3602,82 +3601,44 @@ function updateStats() {
         const assignments = leadershipSchedule[key] || [];
         assignments.forEach(assignment => {
             if (!assignment || !assignment.member || !assignment.client) return;
-            if (leadershipPersonHours.hasOwnProperty(assignment.member)) {
-                leadershipPersonHours[assignment.member] += blockHours;
-            }
-            if (leadershipClientHours.hasOwnProperty(assignment.client)) {
-                leadershipClientHours[assignment.client] += blockHours;
+            personHours[assignment.member] = (personHours[assignment.member] || 0) + blockHours;
+            if (clientHours.hasOwnProperty(assignment.client)) {
+                clientHours[assignment.client] += blockHours;
+            } else {
+                clientHours[assignment.client] = blockHours;
             }
         });
     });
     
-    // Render person stats
+    // Render person stats (production + leadership combined)
     const personStatsDiv = document.getElementById('personStats');
-    personStatsDiv.innerHTML = '';
-    
-    const sortedPersons = Object.entries(personHours)
-        .sort((a, b) => b[1] - a[1]);
-    
-    sortedPersons.forEach(([name, hours]) => {
-        const statItem = document.createElement('div');
-        statItem.className = 'stat-item';
-        const member = teamMembers.find(m => m.name === name);
-        const color = member ? member.color : '#ce2828';
-        statItem.innerHTML = `
-            <div class="stat-color" style="background-color: ${color}"></div>
-            <span class="stat-name">${name}</span>
-            <span class="stat-value">${hours}h</span>
-        `;
-        personStatsDiv.appendChild(statItem);
-    });
-    
-    // Render client stats
-    const clientStatsDiv = document.getElementById('clientStats');
-    clientStatsDiv.innerHTML = '';
-    
-    const sortedClients = Object.entries(clientHours)
-        .sort((a, b) => b[1] - a[1]);
-    
-    sortedClients.forEach(([name, hours]) => {
-        const statItem = document.createElement('div');
-        statItem.className = 'stat-item';
-        const client = clients.find(c => c.name === name);
-        const color = client ? client.color : '#667eea';
-        statItem.innerHTML = `
-            <div class="stat-color" style="background-color: ${color}"></div>
-            <span class="stat-name">${name}</span>
-            <span class="stat-value">${hours}h</span>
-        `;
-        clientStatsDiv.appendChild(statItem);
-    });
-
-    // Render leadership stats (hours per leadership member and per client from leadership blocks)
-    const leadershipPersonStatsDiv = document.getElementById('leadershipPersonStats');
-    const leadershipClientStatsDiv = document.getElementById('leadershipClientStats');
-    if (leadershipPersonStatsDiv) {
-        leadershipPersonStatsDiv.innerHTML = '';
-        const sortedLeadership = Object.entries(leadershipPersonHours)
+    if (personStatsDiv) {
+        personStatsDiv.innerHTML = '';
+        const sortedPersons = Object.entries(personHours)
             .filter(([, h]) => h > 0)
             .sort((a, b) => b[1] - a[1]);
-        sortedLeadership.forEach(([name, hours]) => {
+        sortedPersons.forEach(([name, hours]) => {
             const statItem = document.createElement('div');
             statItem.className = 'stat-item';
-            const member = leadershipMembers.find(m => m.name === name);
+            const member = teamMembers.find(m => m.name === name) || leadershipMembers.find(m => m.name === name);
             const color = member ? member.color : '#ce2828';
             statItem.innerHTML = `
                 <div class="stat-color" style="background-color: ${color}"></div>
                 <span class="stat-name">${name}</span>
                 <span class="stat-value">${hours}h</span>
             `;
-            leadershipPersonStatsDiv.appendChild(statItem);
+            personStatsDiv.appendChild(statItem);
         });
     }
-    if (leadershipClientStatsDiv) {
-        leadershipClientStatsDiv.innerHTML = '';
-        const sortedLeadershipClients = Object.entries(leadershipClientHours)
+    
+    // Render client stats (production + leadership combined)
+    const clientStatsDiv = document.getElementById('clientStats');
+    if (clientStatsDiv) {
+        clientStatsDiv.innerHTML = '';
+        const sortedClients = Object.entries(clientHours)
             .filter(([, h]) => h > 0)
             .sort((a, b) => b[1] - a[1]);
-        sortedLeadershipClients.forEach(([name, hours]) => {
+        sortedClients.forEach(([name, hours]) => {
             const statItem = document.createElement('div');
             statItem.className = 'stat-item';
             const client = clients.find(c => c.name === name);
@@ -3687,7 +3648,7 @@ function updateStats() {
                 <span class="stat-name">${name}</span>
                 <span class="stat-value">${hours}h</span>
             `;
-            leadershipClientStatsDiv.appendChild(statItem);
+            clientStatsDiv.appendChild(statItem);
         });
     }
 }

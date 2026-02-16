@@ -3788,7 +3788,9 @@ function renderLeadershipMode() {
             // Check if clicking on resize handle
             if (e.target.classList.contains('leadership-time-entry-resize-handle')) {
                 const entry = e.target.closest('.leadership-time-entry');
-                if (entry && entry.dataset.blockKey) {
+                if (entry && entry.dataset.blockKey && !entry.classList.contains('leadership-drag-preview')) {
+                    e.preventDefault();
+                    e.stopPropagation();
                     leadershipResizeState = {
                         entry: entry,
                         isTop: e.target.classList.contains('top'),
@@ -3797,6 +3799,8 @@ function renderLeadershipMode() {
                         endMinutes: parseInt(entry.dataset.endMinutes),
                         memberIndex: memberIndex
                     };
+                    document.addEventListener('mousemove', handleMouseMove);
+                    document.addEventListener('mouseup', handleMouseUp, { once: true });
                     return;
                 }
             }
@@ -3888,10 +3892,14 @@ function renderLeadershipMode() {
                 return;
             }
             
-            // Handle drag end: always create exactly one 1-hour block at the slot where they started (mousedown)
+            // Handle drag end: create block spanning the full dragged range
             if (leadershipDragState && leadershipDragState.memberIndex === memberIndex) {
-                const finalStart = leadershipDragState.startMinutes;
-                const finalEnd = Math.min(1200, finalStart + 60);
+                const start = leadershipDragState.startMinutes;
+                const end = leadershipDragState.currentMinutes;
+                const finalStart = Math.max(480, Math.min(start, end));
+                let finalEnd = Math.min(1200, Math.max(start, end));
+                const minDuration = 15;
+                if (finalEnd - finalStart < minDuration) finalEnd = Math.min(1200, finalStart + minDuration);
                 document.querySelectorAll('.leadership-drag-preview').forEach(el => el.remove());
                 if (finalEnd > finalStart) {
                     showLeadershipClientModal(memberIndex, finalStart, finalEnd);
@@ -3950,11 +3958,13 @@ function renderLeadershipMode() {
             const columnRect = memberColumn.getBoundingClientRect();
             const relativeY = e.clientY - columnRect.top;
             const startMinutes = Math.max(480, Math.min(1140, 480 + Math.round(relativeY))); // 1140 so +60 <= 1200
-            const endMinutes = startMinutes + 60;
+            let endMinutes = startMinutes + 60;
 
             try {
                 const parsed = JSON.parse(data);
                 if (parsed && parsed.type === 'leadership-entry') {
+                    const duration = Math.max(15, Math.min(720, parseInt(parsed.durationMinutes, 10) || 60));
+                    endMinutes = Math.min(1200, startMinutes + duration);
                     moveLeadershipEntry(parsed.blockKey, parsed.assignmentIndex, memberIndex, startMinutes, endMinutes);
                     return;
                 }
@@ -3974,13 +3984,14 @@ function renderLeadershipMode() {
     renderAllLeadershipTimeEntries();
 }
 
-// Update drag preview (minute-based). Always shows 1-hour block at start position (we only create 1 hour).
+// Update drag preview (minute-based). Shows block spanning dragged range.
 function updateLeadershipDragPreview() {
     document.querySelectorAll('.leadership-drag-preview').forEach(el => el.remove());
     if (!leadershipDragState) return;
-    const { memberIndex, startMinutes } = leadershipDragState;
-    const start = startMinutes;
-    const end = Math.min(1200, start + 60);
+    const { memberIndex, startMinutes, currentMinutes } = leadershipDragState;
+    const start = Math.max(480, Math.min(startMinutes, currentMinutes));
+    let end = Math.min(1200, Math.max(startMinutes, currentMinutes));
+    if (end - start < 15) end = Math.min(1200, start + 15);
     const duration = end - start;
     const memberColumn = document.querySelector(`.leadership-member-column[data-member-index="${memberIndex}"]`);
     if (!memberColumn) return;
@@ -3990,7 +4001,9 @@ function updateLeadershipDragPreview() {
     preview.style.height = `${duration}px`;
     preview.style.background = 'rgba(100, 200, 255, 0.5)';
     preview.style.border = '2px dashed rgba(100, 200, 255, 0.8)';
-    preview.textContent = duration === 60 ? '1h' : duration + 'm';
+    const hours = Math.floor(duration / 60);
+    const mins = duration % 60;
+    preview.textContent = hours > 0 ? `${hours}h ${mins}m` : `${duration}m`;
     memberColumn.appendChild(preview);
 }
 
@@ -4014,7 +4027,7 @@ function renderLeadershipTimeEntries(column, memberIndex, hour) {
     // We'll render all entries in renderAllLeadershipTimeEntries
 }
 
-// Helper: render one leadership assignment into a member column (1-hour blocks; no resize handles).
+// Helper: render one leadership assignment into a member column (variable length; top/bottom resize handles when editable).
 function renderOneLeadershipEntry(memberColumn, blockKey, assignment, assignmentIdx, startMinutes, endMinutes) {
     const duration = endMinutes - startMinutes;
     const client = clients.find(c => c.name === assignment.client);
@@ -4033,17 +4046,21 @@ function renderOneLeadershipEntry(memberColumn, blockKey, assignment, assignment
     const mins = duration % 60;
     const durationText = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
     const canEdit = isAdminMode || isLeadershipMode;
+    const resizeHandles = canEdit ? '<div class="leadership-time-entry-resize-handle top" title="Drag to change start time"></div><div class="leadership-time-entry-resize-handle bottom" title="Drag to extend or shorten"></div>' : '';
     entry.innerHTML = `
+        ${resizeHandles}
         <span>${assignment.client} (${durationText})</span>
         ${canEdit ? '<button class="leadership-time-entry-delete" onclick="deleteLeadershipTimeEntry(event, \'' + blockKey.replace(/'/g, "\\'") + '\', ' + assignmentIdx + ')">&times;</button>' : ''}
     `;
     if (canEdit) {
         entry.draggable = true;
         entry.addEventListener('dragstart', (ev) => {
+            const duration = endMinutes - startMinutes;
             ev.dataTransfer.setData('text/plain', JSON.stringify({
                 type: 'leadership-entry',
                 blockKey: blockKey,
-                assignmentIndex: assignmentIdx
+                assignmentIndex: assignmentIdx,
+                durationMinutes: duration
             }));
             ev.dataTransfer.effectAllowed = 'move';
             entry.classList.add('leadership-dragging');
@@ -4213,11 +4230,11 @@ function closeLeadershipClientModal() {
     document.querySelectorAll('.leadership-drag-preview').forEach(el => el.remove());
 }
 
-// Create time entry in leadership mode (minute-based). Always creates 1-hour blocks.
+// Create time entry in leadership mode (minute-based). Uses the given start/end range.
 function createLeadershipTimeEntry(memberIndex, startMinutes, endMinutes, clientName) {
     if (!isAdminMode && !isLeadershipMode) return;
-    endMinutes = startMinutes + 60; // Always 1 hour
     if (endMinutes > 1200) endMinutes = 1200;
+    if (endMinutes <= startMinutes) endMinutes = startMinutes + 60;
 
     const membersToUse = isLeadershipMode ? leadershipMembers : teamMembers;
     const member = membersToUse[memberIndex];
@@ -4291,7 +4308,7 @@ window.deleteLeadershipTimeEntry = function(event, blockKey, assignmentIndex) {
     updateStats();
 };
 
-// Move a leadership entry to another column/time (drag-and-drop). Blocks are always 1 hour.
+// Move a leadership entry to another column/time (drag-and-drop). Preserves block duration when provided.
 function moveLeadershipEntry(fromBlockKey, assignmentIndex, toMemberIndex, startMinutes, endMinutes) {
     const assignments = leadershipSchedule[fromBlockKey];
     if (!assignments || !assignments[assignmentIndex]) return;

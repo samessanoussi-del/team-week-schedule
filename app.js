@@ -3924,14 +3924,11 @@ function renderLeadershipMode() {
                 return;
             }
             
-            // Handle drag end (leadership blocks are always 1 hour)
+            // Handle drag end: always create exactly one 1-hour block at the slot where they started (mousedown)
             if (leadershipDragState && leadershipDragState.memberIndex === memberIndex) {
-                const start = Math.min(leadershipDragState.startMinutes, leadershipDragState.currentMinutes);
-                const end = Math.max(leadershipDragState.startMinutes, leadershipDragState.currentMinutes);
-                const duration = end - start;
-                if (duration > 0 || !leadershipDragState.isDragging) {
-                    const finalStart = leadershipDragState.isDragging ? start : leadershipDragState.startMinutes;
-                    const finalEnd = Math.min(1200, finalStart + 60);
+                const finalStart = leadershipDragState.startMinutes;
+                const finalEnd = Math.min(1200, finalStart + 60);
+                if (finalEnd > finalStart) {
                     showLeadershipClientModal(memberIndex, finalStart, finalEnd);
                 }
                 
@@ -4022,31 +4019,23 @@ function renderLeadershipMode() {
     renderAllLeadershipTimeEntries();
 }
 
-// Update drag preview (minute-based)
+// Update drag preview (minute-based). Always shows 1-hour block at start position (we only create 1 hour).
 function updateLeadershipDragPreview() {
-    // Remove existing previews
     document.querySelectorAll('.leadership-drag-preview').forEach(el => el.remove());
-    
     if (!leadershipDragState) return;
-    
-    const { memberIndex, startMinutes, currentMinutes } = leadershipDragState;
-    const start = Math.min(startMinutes, currentMinutes);
-    const end = Math.max(startMinutes, currentMinutes);
+    const { memberIndex, startMinutes } = leadershipDragState;
+    const start = startMinutes;
+    const end = Math.min(1200, start + 60);
     const duration = end - start;
-    const hours = Math.floor(duration / 60);
-    const mins = duration % 60;
-    const durationText = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
-    
     const memberColumn = document.querySelector(`.leadership-member-column[data-member-index="${memberIndex}"]`);
     if (!memberColumn) return;
-    
     const preview = document.createElement('div');
     preview.className = 'leadership-time-entry leadership-drag-preview';
-    preview.style.top = `${start - 480}px`; // 480 = 8:00 AM in minutes
+    preview.style.top = `${start - 480}px`;
     preview.style.height = `${duration}px`;
     preview.style.background = 'rgba(100, 200, 255, 0.5)';
     preview.style.border = '2px dashed rgba(100, 200, 255, 0.8)';
-    preview.textContent = durationText;
+    preview.textContent = duration === 60 ? '1h' : duration + 'm';
     memberColumn.appendChild(preview);
 }
 
@@ -4104,9 +4093,14 @@ function renderOneLeadershipEntry(memberColumn, blockKey, assignment, assignment
             ev.dataTransfer.effectAllowed = 'move';
             entry.classList.add('leadership-dragging');
         });
-        entry.addEventListener('dragend', () => entry.classList.remove('leadership-dragging'));
+        entry.addEventListener('dragend', () => {
+            entry.classList.remove('leadership-dragging');
+            window._leadershipEntryDragJustEnded = true;
+            setTimeout(() => { window._leadershipEntryDragJustEnded = false; }, 150);
+        });
         entry.addEventListener('click', (ev) => {
             ev.stopPropagation();
+            if (window._leadershipEntryDragJustEnded) return;
             showLeadershipEditModal(entry);
         });
     }

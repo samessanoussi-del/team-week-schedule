@@ -260,55 +260,66 @@ document.addEventListener('DOMContentLoaded', async () => {
     const authScreen = document.getElementById('authScreen');
     const appContainer = document.getElementById('appContainer');
     const hasAuthGate = authScreen && appContainer;
-    if (hasAuthGate) {
-        let storedUser = JSON.parse(localStorage.getItem('teamScheduleUser') || 'null');
-        if (storedUser && storedUser.email) {
-            const users = JSON.parse(localStorage.getItem('teamScheduleUsers') || '{}');
-            const latest = users[storedUser.email];
-            if (latest) {
-                storedUser = { ...storedUser, profilePictureUrl: latest.profilePictureUrl || storedUser.profilePictureUrl, avatarBorderColor: latest.avatarBorderColor || storedUser.avatarBorderColor, firstName: latest.firstName ?? storedUser.firstName, lastName: latest.lastName ?? storedUser.lastName };
+    try {
+        if (hasAuthGate) {
+            let storedUser = JSON.parse(localStorage.getItem('teamScheduleUser') || 'null');
+            if (storedUser && storedUser.email) {
+                const users = JSON.parse(localStorage.getItem('teamScheduleUsers') || '{}');
+                const latest = users[storedUser.email];
+                if (latest) {
+                    storedUser = { ...storedUser, profilePictureUrl: latest.profilePictureUrl || storedUser.profilePictureUrl, avatarBorderColor: latest.avatarBorderColor || storedUser.avatarBorderColor, firstName: latest.firstName ?? storedUser.firstName, lastName: latest.lastName ?? storedUser.lastName };
+                }
             }
+            currentUser = storedUser;
+            if (!currentUser) {
+                authScreen.style.display = 'flex';
+                appContainer.style.display = 'none';
+                setupAuthListeners();
+                return;
+            }
+            const profileFromSupabase = await loadProfileFromSupabase(currentUser.email);
+            if (profileFromSupabase) {
+                currentUser.firstName = profileFromSupabase.first_name ?? currentUser.firstName;
+                currentUser.lastName = profileFromSupabase.last_name ?? currentUser.lastName;
+                currentUser.profilePictureUrl = profileFromSupabase.profile_picture_url ?? currentUser.profilePictureUrl;
+                currentUser.avatarBorderColor = profileFromSupabase.avatar_border_color ?? currentUser.avatarBorderColor;
+            }
+            authScreen.style.display = 'none';
+            appContainer.style.display = 'flex';
+        } else {
+            if (appContainer) appContainer.style.display = 'flex';
         }
-        currentUser = storedUser;
-        if (!currentUser) {
-            showAuthScreen();
-            setupAuthListeners();
-            return;
-        }
-        const profileFromSupabase = await loadProfileFromSupabase(currentUser.email);
-        if (profileFromSupabase) {
-            currentUser.firstName = profileFromSupabase.first_name ?? currentUser.firstName;
-            currentUser.lastName = profileFromSupabase.last_name ?? currentUser.lastName;
-            currentUser.profilePictureUrl = profileFromSupabase.profile_picture_url ?? currentUser.profilePictureUrl;
-            currentUser.avatarBorderColor = profileFromSupabase.avatar_border_color ?? currentUser.avatarBorderColor;
-        }
-        authScreen.style.display = 'none';
-        appContainer.style.display = 'flex';
-    }
-    await loadData();
-    initializeCalendar();
-    setupEventListeners();
-    renderSidebar();
-    renderSettings();
-    updateStats();
-    // Delay realtime subscriptions to avoid first-load flicker (race with initial render)
-    setTimeout(() => setupRealtimeSubscriptions(), 1500);
-    renderTimeTracking();
-    updateDayHeaders();
-    renderOnlineUsersStrip();
-    if (currentUser) {
-        updateMyOnlinePresence();
-        fetchOnlineUsers();
-        setInterval(updateMyOnlinePresence, 30000);
-        setInterval(fetchOnlineUsers, 30000);
-    }
-    console.log('✅ App initialized');
-
-    // Update day headers every minute to catch day changes
-    setInterval(() => {
+        await loadData();
+        initializeCalendar();
+        setupEventListeners();
+        renderSidebar();
+        renderSettings();
+        updateStats();
+        setTimeout(() => setupRealtimeSubscriptions(), 1500);
+        renderTimeTracking();
         updateDayHeaders();
-        renderCalendar(); // Re-render to update day columns too
-    }, 60000); // Check every minute
+        renderOnlineUsersStrip();
+        if (currentUser) {
+            updateMyOnlinePresence();
+            fetchOnlineUsers();
+            setInterval(updateMyOnlinePresence, 30000);
+            setInterval(fetchOnlineUsers, 30000);
+        }
+        console.log('✅ App initialized');
+        setInterval(() => {
+            updateDayHeaders();
+            renderCalendar();
+        }, 60000);
+    } catch (err) {
+        console.error('App init error:', err);
+        if (authScreen) authScreen.style.display = 'flex';
+        if (appContainer) appContainer.style.display = 'none';
+        setupAuthListeners();
+        if (authScreen) {
+            const sub = authScreen.querySelector('.auth-subtitle');
+            if (sub) sub.textContent = 'Something went wrong. Try signing in again or refresh the page.';
+        }
+    }
 });
 
 // Real-time subscription channels
@@ -564,8 +575,11 @@ async function loadClients(skipDefaults = false) {
 function splitScheduleAfterLoad(raw) {
     schedule = {};
     leadershipSchedule = {};
+    if (!raw || typeof raw !== 'object') return;
     Object.keys(raw).forEach(key => {
-        const arr = raw[key] && !Array.isArray(raw[key]) ? [raw[key]] : (raw[key] || []);
+        let arr = raw[key];
+        if (!Array.isArray(arr)) arr = arr != null ? [arr] : [];
+        arr = arr.filter(a => a && typeof a === 'object');
         if (isLeadershipBlockKey(key)) {
             leadershipSchedule[key] = arr;
         } else {
@@ -608,7 +622,14 @@ async function loadSchedule() {
         const raw = {};
         if (data && data.length > 0) {
             data.forEach(row => {
-                raw[row.block_key] = row.assignments;
+                const key = row && row.block_key != null ? String(row.block_key) : null;
+                if (!key) return;
+                let val = row.assignments;
+                if (typeof val === 'string') {
+                    try { val = JSON.parse(val); } catch (_) { val = []; }
+                }
+                if (!Array.isArray(val)) val = val ? [val] : [];
+                raw[key] = val;
             });
         }
         Object.keys(raw).forEach(key => {
@@ -1257,7 +1278,9 @@ function renderCalendar() {
                 // Track which original indices we've already used to handle duplicates
                 const usedIndices = new Set();
                 sortedAssignments.forEach((assignment, sortedIndex) => {
-                    // Find the original index in the unsorted array, skipping already used ones
+                    if (!assignment || typeof assignment !== 'object') return;
+                    const mem = assignment.member != null ? String(assignment.member) : '';
+                    const cli = assignment.client != null ? String(assignment.client) : '';
                     let originalIndex = -1;
                     for (let i = 0; i < assignments.length; i++) {
                         if (!usedIndices.has(i) && 
@@ -1268,18 +1291,18 @@ function renderCalendar() {
                             break;
                         }
                     }
-                    // Fallback if not found (shouldn't happen)
                     if (originalIndex === -1) {
                         originalIndex = assignments.findIndex(a => 
-                            a.member === assignment.member && a.client === assignment.client
+                            a && a.member === assignment.member && a.client === assignment.client
                         );
                     }
                     
-                    const member = teamMembers.find(m => m.name === assignment.member);
-                    const client = clients.find(c => c.name === assignment.client);
+                    const member = teamMembers.find(m => m.name === mem);
+                    const client = clients.find(c => c.name === cli);
                     const memberColor = member ? member.color : '#ce2828';
                     const clientColor = client ? client.color : '#667eea';
                     const profilePicture = member && member.profilePicture ? member.profilePicture : '';
+                    const memberInitial = mem ? mem.charAt(0).toUpperCase() : '?';
 
                     const assignmentDiv = document.createElement('div');
                     assignmentDiv.className = 'assignment';
@@ -1293,16 +1316,16 @@ function renderCalendar() {
                             <div class="assignment-member-section" style="background-color: ${memberColor}; color: ${memberTextColor};">
                                 <div class="assignment-member-circle">
                                     ${profilePicture ? 
-                                        `<img src="${profilePicture}" alt="${assignment.member}" class="assignment-profile-picture">` : 
-                                        `<span class="assignment-member-initial" style="color: ${memberTextColor};">${assignment.member.charAt(0).toUpperCase()}</span>`
+                                        `<img src="${profilePicture}" alt="${mem}" class="assignment-profile-picture">` : 
+                                        `<span class="assignment-member-initial" style="color: ${memberTextColor};">${memberInitial}</span>`
                                     }
                                 </div>
                                 <div class="assignment-member-box">
-                                    <span class="assignment-member-name" style="color: ${memberTextColor};">${assignment.member}</span>
+                                    <span class="assignment-member-name" style="color: ${memberTextColor};">${mem}</span>
                                 </div>
                             </div>
                             <div class="assignment-client-box" style="background-color: ${clientColor};">
-                                <span class="assignment-client-name" style="color: ${clientTextColor};">${assignment.client}</span>
+                                <span class="assignment-client-name" style="color: ${clientTextColor};">${cli}</span>
                                 ${isAdminMode ? `<button class="assignment-remove" onclick="removeAssignment('${blockKey}', ${originalIndex})">×</button>` : ''}
                             </div>
                         </div>

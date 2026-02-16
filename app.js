@@ -1997,6 +1997,8 @@ function renderSettings() {
     const leadershipMembersList = document.getElementById('leadershipMembersSettingsList');
     const clientsList = document.getElementById('clientsSettingsList');
 
+    if (!membersList) return;
+
     membersList.innerHTML = '';
     teamMembers.forEach((member, index) => {
         const item = document.createElement('div');
@@ -2036,6 +2038,42 @@ function renderSettings() {
         membersList.appendChild(item);
     });
 
+    if (leadershipMembersList) {
+    leadershipMembersList.innerHTML = '';
+    leadershipMembers.forEach((member, index) => {
+        const item = document.createElement('div');
+        item.className = 'settings-item';
+        const disabledAttr = isAdminMode ? '' : 'disabled';
+        const disabledStyle = isAdminMode ? '' : 'opacity: 0.5; pointer-events: none;';
+        item.innerHTML = `
+            <div class="settings-item-profile-section" style="${disabledStyle}">
+                <div class="profile-picture-container">
+                    <label for="leadershipProfile${index}" class="profile-picture-label">
+                        ${member.profilePicture ?
+                            `<img src="${member.profilePicture}" alt="${member.name}" class="profile-picture-preview">` :
+                            `<div class="profile-picture-placeholder">+</div>`
+                        }
+                    </label>
+                    <input type="file" id="leadershipProfile${index}" accept="image/*"
+                           onchange="updateLeadershipMemberProfile(${index}, this)" class="profile-picture-input" style="display: none;" ${disabledAttr}>
+                </div>
+                <div class="settings-item-color-picker">
+                    <input type="color" id="leadershipColor${index}" value="${member.color}"
+                           onchange="updateLeadershipMemberColor(${index}, this.value)" class="color-picker" ${disabledAttr}>
+                    <label for="leadershipColor${index}" class="color-picker-label"></label>
+                </div>
+            </div>
+            <span class="settings-item-name">${member.name}</span>
+            <div class="settings-item-actions" style="${disabledStyle}">
+                <button class="btn-edit" onclick="editLeadershipMember(${index})" ${disabledAttr}>Edit</button>
+                <button class="btn-delete" onclick="deleteLeadershipMember(${index})" ${disabledAttr}>Delete</button>
+            </div>
+        `;
+        leadershipMembersList.appendChild(item);
+    });
+    }
+
+    if (!clientsList) return;
     clientsList.innerHTML = '';
     clients.forEach((client, index) => {
         const item = document.createElement('div');

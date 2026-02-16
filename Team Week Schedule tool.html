@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Team Week Schedule</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
-    <link rel="stylesheet" href="styles.css?v=12">
+    <link rel="stylesheet" href="styles.css?v=13">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
 <body>
@@ -156,6 +156,18 @@
                                 <!-- Members list will be populated here -->
                             </div>
                         </div>
+                        <div class="settings-section">
+                            <h3>Leadership Members</h3>
+                            <div class="settings-controls">
+                                <input type="text" id="newLeadershipMemberName" placeholder="Member name" class="input-field">
+                                <button id="addLeadershipMemberBtn" class="btn-primary">Add Member</button>
+                            </div>
+                            <div id="leadershipMembersSettingsList" class="settings-list">
+                                <!-- Leadership members list will be populated here -->
+                            </div>
+                        </div>
+                    </div>
+                    <div class="settings-clients-column">
                         <div class="settings-section">
                             <h3>Clients</h3>
                             <div class="settings-controls">

@@ -1231,11 +1231,12 @@ body.bright-theme .close-btn:hover {
 
 .settings-layout {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr minmax(200px, 280px) 1fr minmax(200px, 280px);
     gap: 2rem;
     align-items: start;
     min-height: 0;
     height: fit-content;
+    width: 100%;
 }
 
 .settings-left-column {
@@ -1244,6 +1245,13 @@ body.bright-theme .close-btn:hover {
     gap: 2rem;
     align-content: start;
     height: fit-content;
+}
+
+.settings-clients-column {
+    display: flex;
+    flex-direction: column;
+    min-width: 200px;
+    max-width: 280px;
 }
 
 .settings-right-column {
@@ -2418,6 +2426,11 @@ body.bright-theme .leadership-hour-cell:hover {
 .settings-left-column,
 .settings-right-column {
     min-width: 0;
+}
+.settings-clients-column {
+    min-width: 0;
+    min-width: 200px;
+    max-width: 280px;
 }
 .settings-right-column {
     flex: 1;

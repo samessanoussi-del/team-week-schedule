@@ -331,13 +331,9 @@ function setupRealtimeSubscriptions() {
     realtimeChannels.teamMembers = supabase
         .channel('team_members_changes')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'team_members' }, async (payload) => {
-            // Skip if we're currently saving to prevent loops
-            if (isSaving) {
-                console.log('⏭️ Skipping real-time update (save in progress)');
-                return;
-            }
+            if (isSaving) return;
             console.log('📢 Real-time update: team_members changed', payload.eventType);
-            await loadTeamMembers(true); // Skip defaults on real-time updates
+            await loadTeamMembers(true);
             renderSidebar();
             renderSettings();
             renderCalendar();
@@ -426,72 +422,68 @@ function setupRealtimeSubscriptions() {
     console.log('✅ Real-time subscriptions set up');
 }
 
-// Load team members from Supabase
+// Load all members from Supabase (one list: team_members with is_leadership column).
+// Splits into teamMembers (production) and leadershipMembers for the UI.
 async function loadTeamMembers(skipDefaults = false) {
-    // Check if supabase is available
     if (typeof supabase === 'undefined') {
         console.warn('Supabase not available, using localStorage');
         const savedMembers = localStorage.getItem('teamMembers');
-        if (savedMembers) {
-            teamMembers = JSON.parse(savedMembers);
-        } else {
-            teamMembers = [
-                { name: 'John Doe', color: '#ce2828', profilePicture: '' },
-                { name: 'Jane Smith', color: '#4a90e2', profilePicture: '' },
-                { name: 'Bob Johnson', color: '#50c878', profilePicture: '' }
-            ];
-        }
+        const savedLeadership = localStorage.getItem('leadershipMembers');
+        if (savedMembers) teamMembers = JSON.parse(savedMembers);
+        else teamMembers = [
+            { name: 'John Doe', color: '#ce2828', profilePicture: '' },
+            { name: 'Jane Smith', color: '#4a90e2', profilePicture: '' },
+            { name: 'Bob Johnson', color: '#50c878', profilePicture: '' }
+        ];
+        if (savedLeadership) leadershipMembers = JSON.parse(savedLeadership);
+        else leadershipMembers = [];
         return;
     }
-    
+
     try {
         const { data, error } = await supabase
             .from('team_members')
             .select('*')
             .order('name');
 
-        if (error) {
-            console.error('Supabase error loading team members:', error);
-            throw error;
-        }
+        if (error) throw error;
 
         if (data && data.length > 0) {
-            teamMembers = data.map(m => ({
+            const base = (m) => ({
                 name: m.name,
                 color: m.color,
                 profilePicture: m.profile_picture || ''
-            }));
-        } else if (!skipDefaults) {
-            // Only create defaults on initial load, not on real-time updates
-            // Default data if empty
-            console.log('No team members found, creating defaults...');
-            teamMembers = [
-                { name: 'John Doe', color: '#ce2828', profilePicture: '' },
-                { name: 'Jane Smith', color: '#4a90e2', profilePicture: '' },
-                { name: 'Bob Johnson', color: '#50c878', profilePicture: '' }
-            ];
-            // Save defaults to database (don't await - let it happen in background)
-            if (!isSaving) {
-                isSaving = true;
-                saveTeamMembers().catch(err => console.error('Failed to save default team members:', err)).finally(() => {
-                    isSaving = false;
-                });
+            });
+            teamMembers = data.filter(m => !m.is_leadership).map(base);
+            leadershipMembers = data.filter(m => m.is_leadership).map(base);
+        } else {
+            teamMembers = [];
+            leadershipMembers = [];
+            if (!skipDefaults) {
+                console.log('No team members found, creating defaults...');
+                teamMembers = [
+                    { name: 'John Doe', color: '#ce2828', profilePicture: '' },
+                    { name: 'Jane Smith', color: '#4a90e2', profilePicture: '' },
+                    { name: 'Bob Johnson', color: '#50c878', profilePicture: '' }
+                ];
+                if (!isSaving) {
+                    isSaving = true;
+                    saveTeamMembers().catch(err => console.error('Failed to save default team members:', err)).finally(() => { isSaving = false; });
+                }
             }
         }
     } catch (error) {
         console.error('Error loading team members:', error);
-        // Fallback to localStorage
         const savedMembers = localStorage.getItem('teamMembers');
-        if (savedMembers) {
-            teamMembers = JSON.parse(savedMembers);
-        } else {
-            // If no localStorage data, use defaults
-            teamMembers = [
-                { name: 'John Doe', color: '#ce2828', profilePicture: '' },
-                { name: 'Jane Smith', color: '#4a90e2', profilePicture: '' },
-                { name: 'Bob Johnson', color: '#50c878', profilePicture: '' }
-            ];
-        }
+        const savedLeadership = localStorage.getItem('leadershipMembers');
+        if (savedMembers) teamMembers = JSON.parse(savedMembers);
+        else teamMembers = [
+            { name: 'John Doe', color: '#ce2828', profilePicture: '' },
+            { name: 'Jane Smith', color: '#4a90e2', profilePicture: '' },
+            { name: 'Bob Johnson', color: '#50c878', profilePicture: '' }
+        ];
+        if (savedLeadership) leadershipMembers = JSON.parse(savedLeadership);
+        else leadershipMembers = [];
     }
 }
 
@@ -737,11 +729,8 @@ async function loadData() {
     console.log('Supabase available:', typeof supabase !== 'undefined');
     
     await loadTeamMembers();
-    console.log('Loaded team members:', teamMembers.length);
-    
-    await loadLeadershipMembers();
-    console.log('Loaded leadership members:', leadershipMembers.length);
-    
+    console.log('Loaded team members:', teamMembers.length, 'leadership:', leadershipMembers.length);
+
     await loadClients();
     console.log('Loaded clients:', clients.length);
     
@@ -805,157 +794,46 @@ function undo() {
     }
 }
 
-// Save team members to Supabase
+// Save all members (production + leadership) to Supabase team_members table with is_leadership flag.
 async function saveTeamMembers() {
-    // Check if supabase is available
     if (typeof supabase === 'undefined') {
         localStorage.setItem('teamMembers', JSON.stringify(teamMembers));
-        return;
-    }
-    
-    try {
-        // Get all existing members first
-        const { data: existing, error: selectError } = await supabase.from('team_members').select('id');
-        if (selectError) {
-            console.error('Error selecting existing team members:', selectError);
-            throw selectError;
-        }
-        
-        // Delete all existing members if any
-        if (existing && existing.length > 0) {
-            const idsToDelete = existing.map(m => m.id);
-            const { error: deleteError } = await supabase
-                .from('team_members')
-                .delete()
-                .in('id', idsToDelete);
-            if (deleteError) {
-                console.error('Error deleting team members:', deleteError);
-                throw deleteError;
-            }
-            console.log('Deleted', existing.length, 'existing team members');
-        }
-        
-        // Insert all current members
-        if (teamMembers.length > 0) {
-            const membersToInsert = teamMembers.map(m => ({
-                name: m.name,
-                color: m.color,
-                profile_picture: m.profilePicture || ''
-            }));
-            
-            const { error } = await supabase
-                .from('team_members')
-                .insert(membersToInsert);
-            
-            if (error) {
-                console.error('Error inserting team members:', error);
-                throw error;
-            }
-            console.log('✅ Saved', teamMembers.length, 'team members to Supabase');
-        }
-    } catch (error) {
-        console.error('Error saving team members:', error);
-        // Fallback to localStorage
-        localStorage.setItem('teamMembers', JSON.stringify(teamMembers));
-    }
-}
-
-// Load leadership members from Supabase
-async function loadLeadershipMembers(skipDefaults = false) {
-    // Check if supabase is available
-    if (typeof supabase === 'undefined') {
-        console.warn('Supabase not available, using localStorage');
-        const savedMembers = localStorage.getItem('leadershipMembers');
-        if (savedMembers) {
-            leadershipMembers = JSON.parse(savedMembers);
-        } else {
-            leadershipMembers = [];
-        }
-        return;
-    }
-    
-    try {
-        const { data, error } = await supabase
-            .from('leadership_members')
-            .select('*')
-            .order('name');
-
-        if (error) {
-            console.error('Supabase error loading leadership members:', error);
-            throw error;
-        }
-
-        if (data && data.length > 0) {
-            leadershipMembers = data.map(m => ({
-                name: m.name,
-                color: m.color,
-                profilePicture: m.profile_picture || ''
-            }));
-        } else {
-            leadershipMembers = [];
-        }
-    } catch (error) {
-        console.error('Error loading leadership members:', error);
-        // Fallback to localStorage
-        const savedMembers = localStorage.getItem('leadershipMembers');
-        if (savedMembers) {
-            leadershipMembers = JSON.parse(savedMembers);
-        } else {
-            leadershipMembers = [];
-        }
-    }
-}
-
-// Save leadership members to Supabase
-async function saveLeadershipMembers() {
-    // Check if supabase is available
-    if (typeof supabase === 'undefined') {
         localStorage.setItem('leadershipMembers', JSON.stringify(leadershipMembers));
         return;
     }
-    
+
     try {
-        // Get all existing members first
-        const { data: existing, error: selectError } = await supabase.from('leadership_members').select('id');
-        if (selectError) {
-            console.error('Error selecting existing leadership members:', selectError);
-            throw selectError;
-        }
-        
-        // Delete all existing members if any
+        const { data: existing, error: selectError } = await supabase.from('team_members').select('id');
+        if (selectError) throw selectError;
+
         if (existing && existing.length > 0) {
             const idsToDelete = existing.map(m => m.id);
-            const { error: deleteError } = await supabase
-                .from('leadership_members')
-                .delete()
-                .in('id', idsToDelete);
-            if (deleteError) {
-                console.error('Error deleting leadership members:', deleteError);
-                throw deleteError;
-            }
+            const { error: deleteError } = await supabase.from('team_members').delete().in('id', idsToDelete);
+            if (deleteError) throw deleteError;
         }
-        
-        // Insert all current members
-        if (leadershipMembers.length > 0) {
-            const membersToInsert = leadershipMembers.map(m => ({
-                name: m.name,
-                color: m.color,
-                profile_picture: m.profilePicture || ''
-            }));
-            
-            const { error } = await supabase
-                .from('leadership_members')
-                .insert(membersToInsert);
-            
-            if (error) {
-                console.error('Error inserting leadership members:', error);
-                throw error;
-            }
-            console.log('✅ Saved', leadershipMembers.length, 'leadership members to Supabase');
+
+        const productionRows = teamMembers.map(m => ({
+            name: m.name,
+            color: m.color,
+            profile_picture: m.profilePicture || '',
+            is_leadership: false
+        }));
+        const leadershipRows = leadershipMembers.map(m => ({
+            name: m.name,
+            color: m.color,
+            profile_picture: m.profilePicture || '',
+            is_leadership: true
+        }));
+        const allRows = [...productionRows, ...leadershipRows];
+
+        if (allRows.length > 0) {
+            const { error } = await supabase.from('team_members').insert(allRows);
+            if (error) throw error;
+            console.log('✅ Saved', teamMembers.length, 'production +', leadershipMembers.length, 'leadership members to Supabase');
         }
     } catch (error) {
-        console.error('Error saving leadership members:', error);
-        // Fallback to localStorage
+        console.error('Error saving team members:', error);
+        localStorage.setItem('teamMembers', JSON.stringify(teamMembers));
         localStorage.setItem('leadershipMembers', JSON.stringify(leadershipMembers));
     }
 }
@@ -1181,7 +1059,6 @@ async function saveData() {
     isSaving = true;
     try {
         await saveTeamMembers();
-        await saveLeadershipMembers();
         await saveClients();
         await saveSchedule();
         await saveAppSettings();

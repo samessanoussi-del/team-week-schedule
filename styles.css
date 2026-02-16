@@ -2200,9 +2200,39 @@ body.bright-theme .leadership-header {
     flex-shrink: 0;
     border-right: 2px solid var(--dark-border);
     padding: 1rem;
-    font-weight: 600;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    align-content: flex-start;
+}
+.leadership-day-btn {
+    padding: 0.25rem 0.5rem;
+    border: 1px solid var(--dark-border);
+    border-radius: 4px;
+    background: transparent;
     color: var(--dark-primary);
-    box-sizing: border-box;
+    cursor: pointer;
+    font-size: 0.85rem;
+}
+.leadership-day-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+.leadership-day-btn.active {
+    background: var(--dark-primary);
+    color: var(--dark-bg);
+    border-color: var(--dark-primary);
+}
+body.bright-theme .leadership-day-btn {
+    border-color: var(--bright-border);
+    color: var(--bright-primary);
+}
+body.bright-theme .leadership-day-btn:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+body.bright-theme .leadership-day-btn.active {
+    background: var(--bright-primary);
+    color: #fff;
+    border-color: var(--bright-primary);
 }
 
 body.bright-theme .leadership-time-header {

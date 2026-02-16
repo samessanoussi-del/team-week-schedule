@@ -1111,8 +1111,10 @@ function renderTimeColumn() {
     if (!timeColumn) return;
     
     timeColumn.innerHTML = '';
-    
+
+    // Production calendar: only show production time blocks (exclude leadership hourly slots)
     timeBlocks.forEach((block, index) => {
+        if (block.id.startsWith('leadership-')) return;
         const timeSlot = document.createElement('div');
         timeSlot.className = `time-slot ${block.isLunch ? 'lunch-slot' : ''}`;
         timeSlot.dataset.blockId = block.id;
@@ -1198,6 +1200,9 @@ function renderCalendar() {
         const dateKey = formatDateKey(dayDate, day);
 
         timeBlocks.forEach((block, blockIndex) => {
+            // Production calendar: do not show leadership-only blocks (hourly leadership slots)
+            if (block.id.startsWith('leadership-')) return;
+
             const timeBlock = document.createElement('div');
             timeBlock.className = `time-block ${block.id === 'Lunch' ? 'lunch' : 'work-block'}`;
             
@@ -1205,7 +1210,9 @@ function renderCalendar() {
                 timeBlock.textContent = 'Lunch';
             } else {
                 const blockKey = `${dateKey}-${block.id}`;
-                const assignments = schedule[blockKey] || [];
+                // Only show assignments for production members (exclude leadership members)
+                const productionMemberNames = new Set(teamMembers.map(m => m.name));
+                const assignments = (schedule[blockKey] || []).filter(a => productionMemberNames.has(a.member));
 
                 // Sort assignments alphabetically by member name
                 const sortedAssignments = [...assignments].sort((a, b) => {
@@ -3439,21 +3446,17 @@ function updateStats() {
         dayDate.setDate(currentWeekStart.getDate() + dayIndex);
         const dateKey = formatDateKey(dayDate, day);
         
-        timeBlocks.forEach(block => {
+        timeBlocks.forEach(block) => {
             if (block.isLunch) return;
-            
+            if (block.id.startsWith('leadership-')) return; // Production stats exclude leadership blocks
             const blockKey = `${dateKey}-${block.id}`;
             const assignments = schedule[blockKey] || [];
-            
-            // Calculate hours for this block
             const startHour = parseInt(block.startTime.split(':')[0]);
             const endHour = parseInt(block.endTime.split(':')[0]);
             const blockHours = endHour - startHour;
-            
             if (Array.isArray(assignments)) {
                 assignments.forEach(assignment => {
                     if (!assignment || !assignment.member || !assignment.client) return;
-                    
                     if (personHours.hasOwnProperty(assignment.member)) {
                         personHours[assignment.member] += blockHours;
                     }
@@ -3461,6 +3464,34 @@ function updateStats() {
                         clientHours[assignment.client] += blockHours;
                     }
                 });
+            }
+        });
+    });
+
+    // Leadership hours (from schedule keys *-leadership-{start}-{end}) for current week
+    const leadershipPersonHours = {};
+    const leadershipClientHours = {};
+    leadershipMembers.forEach(m => { leadershipPersonHours[m.name] = 0; });
+    clients.forEach(c => { leadershipClientHours[c.name] = 0; });
+    Object.keys(schedule).forEach((key) => {
+        if (key.indexOf('-leadership-') === -1) return;
+        const parts = key.split('-leadership-');
+        if (parts.length < 2) return;
+        const dayDateKey = parts[0];
+        const suffix = parts[1];
+        const numParts = suffix.split('-').map(Number);
+        if (numParts.length < 2) return;
+        const startMinutes = numParts[0];
+        const endMinutes = numParts[1];
+        const blockHours = (endMinutes - startMinutes) / 60;
+        const assignments = schedule[key] || [];
+        assignments.forEach(assignment => {
+            if (!assignment || !assignment.member || !assignment.client) return;
+            if (leadershipPersonHours.hasOwnProperty(assignment.member)) {
+                leadershipPersonHours[assignment.member] += blockHours;
+            }
+            if (leadershipClientHours.hasOwnProperty(assignment.client)) {
+                leadershipClientHours[assignment.client] += blockHours;
             }
         });
     });
@@ -3504,6 +3535,46 @@ function updateStats() {
         `;
         clientStatsDiv.appendChild(statItem);
     });
+
+    // Render leadership stats (hours per leadership member and per client from leadership blocks)
+    const leadershipPersonStatsDiv = document.getElementById('leadershipPersonStats');
+    const leadershipClientStatsDiv = document.getElementById('leadershipClientStats');
+    if (leadershipPersonStatsDiv) {
+        leadershipPersonStatsDiv.innerHTML = '';
+        const sortedLeadership = Object.entries(leadershipPersonHours)
+            .filter(([, h]) => h > 0)
+            .sort((a, b) => b[1] - a[1]);
+        sortedLeadership.forEach(([name, hours]) => {
+            const statItem = document.createElement('div');
+            statItem.className = 'stat-item';
+            const member = leadershipMembers.find(m => m.name === name);
+            const color = member ? member.color : '#ce2828';
+            statItem.innerHTML = `
+                <div class="stat-color" style="background-color: ${color}"></div>
+                <span class="stat-name">${name}</span>
+                <span class="stat-value">${hours}h</span>
+            `;
+            leadershipPersonStatsDiv.appendChild(statItem);
+        });
+    }
+    if (leadershipClientStatsDiv) {
+        leadershipClientStatsDiv.innerHTML = '';
+        const sortedLeadershipClients = Object.entries(leadershipClientHours)
+            .filter(([, h]) => h > 0)
+            .sort((a, b) => b[1] - a[1]);
+        sortedLeadershipClients.forEach(([name, hours]) => {
+            const statItem = document.createElement('div');
+            statItem.className = 'stat-item';
+            const client = clients.find(c => c.name === name);
+            const color = client ? client.color : '#667eea';
+            statItem.innerHTML = `
+                <div class="stat-color" style="background-color: ${color}"></div>
+                <span class="stat-name">${name}</span>
+                <span class="stat-value">${hours}h</span>
+            `;
+            leadershipClientStatsDiv.appendChild(statItem);
+        });
+    }
 }
 
 // Update mode indicator
@@ -3535,6 +3606,7 @@ function applyViewModeRestrictions() {
 
 // Leadership Mode
 let isLeadershipMode = false;
+let currentLeadershipDayIndex = 0; // 0=Mon .. 4=Fri; which day is shown in leadership columns
 let leadershipDragState = null; // { memberIndex, startMinutes, startY, currentMinutes, isDragging }
 let leadershipMouseDownState = null; // { time, y, timeout }
 let leadershipEditingEntry = null; // { entry, blockKey, assignment, memberIndex }
@@ -3572,11 +3644,27 @@ function toggleLeadershipMode() {
 function renderLeadershipMode() {
     if (!isLeadershipMode) return;
     
+    const timeHeader = document.querySelector('.leadership-time-header');
     const membersHeader = document.getElementById('leadershipMembersHeader');
     const timeColumn = document.getElementById('leadershipTimeColumn');
     const grid = document.getElementById('leadershipGrid');
     
     // Clear existing content
+    if (timeHeader) {
+        timeHeader.innerHTML = '';
+        const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+        days.forEach((label, i) => {
+            const btn = document.createElement('button');
+            btn.className = 'leadership-day-btn' + (i === currentLeadershipDayIndex ? ' active' : '');
+            btn.textContent = label;
+            btn.onclick = () => {
+                currentLeadershipDayIndex = i;
+                document.querySelectorAll('.leadership-day-btn').forEach((b, j) => b.classList.toggle('active', j === i));
+                renderAllLeadershipTimeEntries();
+            };
+            timeHeader.appendChild(btn);
+        });
+    }
     membersHeader.innerHTML = '';
     timeColumn.innerHTML = '';
     grid.innerHTML = '';
@@ -3636,22 +3724,17 @@ function renderLeadershipMode() {
                     return;
                 }
             }
-            // Don't interfere with existing entries (unless clicking delete button)
+            // Don't start create-flow when interacting with an entry (edit/drag handled on the entry)
             if (e.target.closest('.leadership-time-entry') && !e.target.classList.contains('leadership-time-entry-delete')) {
-                // Click on entry to edit - show edit modal
-                const entry = e.target.closest('.leadership-time-entry');
-                if (entry && entry.dataset.blockKey) {
-                    showLeadershipEditModal(entry);
-                }
                 return;
             }
-            
+
             e.preventDefault();
             e.stopPropagation();
             const columnRect = memberColumn.getBoundingClientRect();
             const relativeY = e.clientY - columnRect.top;
-            // Convert pixels to minutes (60px per hour, so 1px = 1 minute)
-            const startMinutes = Math.max(480, Math.min(1200, Math.round(relativeY))); // 8:00 AM = 480 min, 8:00 PM = 1200 min
+            // Convert pixels to minutes: column top = 8:00 AM (480), 60px per hour so 1px = 1 min from 8am
+            const startMinutes = Math.max(480, Math.min(1200, 480 + Math.round(relativeY)));
             
             // Start drag immediately
             leadershipDragState = {
@@ -3679,7 +3762,7 @@ function renderLeadershipMode() {
             if (leadershipResizeState && leadershipResizeState.memberIndex === memberIndex) {
                 const columnRect = memberColumn.getBoundingClientRect();
                 const relativeY = e.clientY - columnRect.top;
-                const newMinutes = Math.max(480, Math.min(1200, Math.round(relativeY)));
+                const newMinutes = Math.max(480, Math.min(1200, 480 + Math.round(relativeY)));
                 
                 if (leadershipResizeState.isTop) {
                     if (newMinutes < leadershipResizeState.endMinutes) {
@@ -3699,7 +3782,7 @@ function renderLeadershipMode() {
             if (leadershipDragState && leadershipDragState.memberIndex === memberIndex) {
                 const columnRect = memberColumn.getBoundingClientRect();
                 const relativeY = e.clientY - columnRect.top;
-                const newMinutes = Math.max(480, Math.min(1200, Math.round(relativeY)));
+                const newMinutes = Math.max(480, Math.min(1200, 480 + Math.round(relativeY)));
                 
                 // Mark as dragging if mouse has moved
                 if (Math.abs(newMinutes - leadershipDragState.startMinutes) > 2) {
@@ -3726,16 +3809,14 @@ function renderLeadershipMode() {
                 return;
             }
             
-            // Handle drag end
+            // Handle drag end (leadership blocks are always 1 hour)
             if (leadershipDragState && leadershipDragState.memberIndex === memberIndex) {
                 const start = Math.min(leadershipDragState.startMinutes, leadershipDragState.currentMinutes);
                 const end = Math.max(leadershipDragState.startMinutes, leadershipDragState.currentMinutes);
                 const duration = end - start;
-                
-                // Always show modal if there's a duration, or if it was a quick click
                 if (duration > 0 || !leadershipDragState.isDragging) {
                     const finalStart = leadershipDragState.isDragging ? start : leadershipDragState.startMinutes;
-                    const finalEnd = leadershipDragState.isDragging ? end : (leadershipDragState.startMinutes + 30);
+                    const finalEnd = Math.min(1200, finalStart + 60);
                     showLeadershipClientModal(memberIndex, finalStart, finalEnd);
                 }
                 
@@ -3799,15 +3880,23 @@ function renderLeadershipMode() {
             e.preventDefault();
             memberColumn.classList.remove('drag-over');
             const data = e.dataTransfer.getData('text/plain');
+            const columnRect = memberColumn.getBoundingClientRect();
+            const relativeY = e.clientY - columnRect.top;
+            const startMinutes = Math.max(480, Math.min(1140, 480 + Math.round(relativeY))); // 1140 so +60 <= 1200
+            const endMinutes = startMinutes + 60;
+
+            try {
+                const parsed = JSON.parse(data);
+                if (parsed && parsed.type === 'leadership-entry') {
+                    moveLeadershipEntry(parsed.blockKey, parsed.assignmentIndex, memberIndex, startMinutes, endMinutes);
+                    return;
+                }
+            } catch (_) {}
             if (!data || !data.startsWith('member:')) return;
             const memberName = data.replace(/^member:/, '');
             const membersToUse = isLeadershipMode ? leadershipMembers : teamMembers;
             const dropMemberIndex = membersToUse.findIndex(m => m.name === memberName);
             if (dropMemberIndex === -1) return;
-            const columnRect = memberColumn.getBoundingClientRect();
-            const relativeY = e.clientY - columnRect.top;
-            const startMinutes = Math.max(480, Math.min(1200, Math.round(relativeY)));
-            const endMinutes = Math.min(1200, startMinutes + 60);
             showLeadershipClientModal(dropMemberIndex, startMinutes, endMinutes);
         });
         
@@ -3866,7 +3955,7 @@ function renderLeadershipTimeEntries(column, memberIndex, hour) {
     // We'll render all entries in renderAllLeadershipTimeEntries
 }
 
-// Helper: render one leadership assignment into a member column (hourly layout; minutes are the source of truth).
+// Helper: render one leadership assignment into a member column (1-hour blocks; no resize handles).
 function renderOneLeadershipEntry(memberColumn, blockKey, assignment, assignmentIdx, startMinutes, endMinutes) {
     const duration = endMinutes - startMinutes;
     const client = clients.find(c => c.name === assignment.client);
@@ -3886,72 +3975,87 @@ function renderOneLeadershipEntry(memberColumn, blockKey, assignment, assignment
     const durationText = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
     const canEdit = isAdminMode || isLeadershipMode;
     entry.innerHTML = `
-        ${canEdit ? '<div class="leadership-time-entry-resize-handle top"></div>' : ''}
         <span>${assignment.client} (${durationText})</span>
         ${canEdit ? '<button class="leadership-time-entry-delete" onclick="deleteLeadershipTimeEntry(event, \'' + blockKey.replace(/'/g, "\\'") + '\', ' + assignmentIdx + ')">&times;</button>' : ''}
-        ${canEdit ? '<div class="leadership-time-entry-resize-handle bottom"></div>' : ''}
     `;
+    if (canEdit) {
+        entry.draggable = true;
+        entry.addEventListener('dragstart', (ev) => {
+            ev.dataTransfer.setData('text/plain', JSON.stringify({
+                type: 'leadership-entry',
+                blockKey: blockKey,
+                assignmentIndex: assignmentIdx
+            }));
+            ev.dataTransfer.effectAllowed = 'move';
+            entry.classList.add('leadership-dragging');
+        });
+        entry.addEventListener('dragend', () => entry.classList.remove('leadership-dragging'));
+        entry.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            showLeadershipEditModal(entry);
+        });
+    }
     memberColumn.appendChild(entry);
 }
 
 // Render all time entries for the leadership (hourly) view. Uses both timeBlocks and direct schedule keys
 // so that hourly leadership entries always show even if the block list differs.
+// Only renders the currently selected day (currentLeadershipDayIndex) so placement matches creation.
 function renderAllLeadershipTimeEntries() {
     document.querySelectorAll('.leadership-time-entry:not(.leadership-drag-preview)').forEach(el => el.remove());
 
     const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
     const membersToSearch = isLeadershipMode ? leadershipMembers : teamMembers;
     const renderedKeys = new Set();
+    const dayIdx = currentLeadershipDayIndex;
+    const dayName = days[dayIdx];
+    const dayDate = new Date(currentWeekStart);
+    dayDate.setDate(currentWeekStart.getDate() + dayIdx);
+    const dayDateKey = formatDateKey(dayDate, dayName);
 
-    days.forEach((dayName, dayIdx) => {
-        const dayDate = new Date(currentWeekStart);
-        dayDate.setDate(currentWeekStart.getDate() + dayIdx);
-        const dayDateKey = formatDateKey(dayDate, dayName);
-
-        // 1) From timeBlocks (block-based; includes leadership-* blocks we added)
-        timeBlocks.forEach((block) => {
-            const blockKey = `${dayDateKey}-${block.id}`;
-            const assignments = schedule[blockKey] || [];
-            assignments.forEach((assignment, assignmentIdx) => {
-                const memberIndex = membersToSearch.findIndex(m => m.name === assignment.member);
-                if (memberIndex === -1) return;
-                const memberColumn = document.querySelector(`.leadership-member-column[data-member-index="${memberIndex}"]`);
-                if (!memberColumn) return;
-                let startMinutes, endMinutes;
-                if (block.id.startsWith('leadership-')) {
-                    const parts = block.id.replace('leadership-', '').split('-').map(Number);
-                    if (parts.length >= 2) {
-                        startMinutes = parts[0];
-                        endMinutes = parts[1];
-                    } else return;
-                } else {
-                    const startParts = (block.startTime || '09:00').split(':');
-                    const endParts = (block.endTime || '10:00').split(':');
-                    startMinutes = parseInt(startParts[0], 10) * 60 + parseInt(startParts[1] || 0, 10);
-                    endMinutes = parseInt(endParts[0], 10) * 60 + parseInt(endParts[1] || 0, 10);
-                }
-                renderOneLeadershipEntry(memberColumn, blockKey, assignment, assignmentIdx, startMinutes, endMinutes);
-                renderedKeys.add(blockKey);
-            });
+    // 1) From timeBlocks (block-based; includes leadership-* blocks we added)
+    timeBlocks.forEach((block) => {
+        const blockKey = `${dayDateKey}-${block.id}`;
+        const assignments = schedule[blockKey] || [];
+        assignments.forEach((assignment, assignmentIdx) => {
+            const memberIndex = membersToSearch.findIndex(m => m.name === assignment.member);
+            if (memberIndex === -1) return;
+            const memberColumn = document.querySelector(`.leadership-member-column[data-member-index="${memberIndex}"]`);
+            if (!memberColumn) return;
+            let startMinutes, endMinutes;
+            if (block.id.startsWith('leadership-')) {
+                const parts = block.id.replace('leadership-', '').split('-').map(Number);
+                if (parts.length >= 2) {
+                    startMinutes = parts[0];
+                    endMinutes = parts[1];
+                } else return;
+            } else {
+                const startParts = (block.startTime || '09:00').split(':');
+                const endParts = (block.endTime || '10:00').split(':');
+                startMinutes = parseInt(startParts[0], 10) * 60 + parseInt(startParts[1] || 0, 10);
+                endMinutes = parseInt(endParts[0], 10) * 60 + parseInt(endParts[1] || 0, 10);
+            }
+            renderOneLeadershipEntry(memberColumn, blockKey, assignment, assignmentIdx, startMinutes, endMinutes);
+            renderedKeys.add(blockKey);
         });
+    });
 
-        // 2) From schedule keys that are hourly (leadership-{start}-{end}) in case they're not in timeBlocks
-        Object.keys(schedule).forEach((key) => {
-            if (!key.startsWith(dayDateKey + '-leadership-') || renderedKeys.has(key)) return;
-            const assignments = schedule[key] || [];
-            const suffix = key.slice((dayDateKey + '-leadership-').length);
-            const parts = suffix.split('-').map(Number);
-            if (parts.length < 2) return;
-            const startMinutes = parts[0];
-            const endMinutes = parts[1];
-            assignments.forEach((assignment, assignmentIdx) => {
-                const memberIndex = membersToSearch.findIndex(m => m.name === assignment.member);
-                if (memberIndex === -1) return;
-                const memberColumn = document.querySelector(`.leadership-member-column[data-member-index="${memberIndex}"]`);
-                if (!memberColumn) return;
-                renderOneLeadershipEntry(memberColumn, key, assignment, assignmentIdx, startMinutes, endMinutes);
-                renderedKeys.add(key);
-            });
+    // 2) From schedule keys that are hourly (leadership-{start}-{end}) in case they're not in timeBlocks
+    Object.keys(schedule).forEach((key) => {
+        if (!key.startsWith(dayDateKey + '-leadership-') || renderedKeys.has(key)) return;
+        const assignments = schedule[key] || [];
+        const suffix = key.slice((dayDateKey + '-leadership-').length);
+        const parts = suffix.split('-').map(Number);
+        if (parts.length < 2) return;
+        const startMinutes = parts[0];
+        const endMinutes = parts[1];
+        assignments.forEach((assignment, assignmentIdx) => {
+            const memberIndex = membersToSearch.findIndex(m => m.name === assignment.member);
+            if (memberIndex === -1) return;
+            const memberColumn = document.querySelector(`.leadership-member-column[data-member-index="${memberIndex}"]`);
+            if (!memberColumn) return;
+            renderOneLeadershipEntry(memberColumn, key, assignment, assignmentIdx, startMinutes, endMinutes);
+            renderedKeys.add(key);
         });
     });
 }
@@ -4041,10 +4145,12 @@ function closeLeadershipClientModal() {
     window.leadershipPendingEntry = null;
 }
 
-// Create time entry in leadership mode (minute-based)
+// Create time entry in leadership mode (minute-based). Always creates 1-hour blocks.
 function createLeadershipTimeEntry(memberIndex, startMinutes, endMinutes, clientName) {
     if (!isAdminMode && !isLeadershipMode) return;
-    
+    endMinutes = startMinutes + 60; // Always 1 hour
+    if (endMinutes > 1200) endMinutes = 1200;
+
     const membersToUse = isLeadershipMode ? leadershipMembers : teamMembers;
     const member = membersToUse[memberIndex];
     if (!member) return;
@@ -4060,9 +4166,10 @@ function createLeadershipTimeEntry(memberIndex, startMinutes, endMinutes, client
     // Create a unique block ID for this time range
     const blockId = `leadership-${startMinutes}-${endMinutes}`;
     
-    // Get current week's days - for now, add to Monday (can be enhanced to allow day selection)
-    const dayName = 'Monday';
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+    const dayName = days[currentLeadershipDayIndex];
     const dayDate = new Date(currentWeekStart);
+    dayDate.setDate(currentWeekStart.getDate() + currentLeadershipDayIndex);
     const dayDateKey = formatDateKey(dayDate, dayName);
     const blockKey = `${dayDateKey}-${blockId}`;
     
@@ -4100,6 +4207,48 @@ function createLeadershipTimeEntry(memberIndex, startMinutes, endMinutes, client
         renderCalendar();
         updateStats();
     }
+}
+
+// Move a leadership entry to another column/time (drag-and-drop). Blocks are always 1 hour.
+function moveLeadershipEntry(fromBlockKey, assignmentIndex, toMemberIndex, startMinutes, endMinutes) {
+    const assignments = schedule[fromBlockKey];
+    if (!assignments || !assignments[assignmentIndex]) return;
+    const assignment = assignments[assignmentIndex];
+    const membersToUse = isLeadershipMode ? leadershipMembers : teamMembers;
+    const toMember = membersToUse[toMemberIndex];
+    if (!toMember) return;
+    const dayDateKey = fromBlockKey.split('-leadership-')[0];
+    if (!dayDateKey) return;
+    const newBlockId = `leadership-${startMinutes}-${endMinutes}`;
+    const newBlockKey = `${dayDateKey}-${newBlockId}`;
+    saveStateToHistory();
+    assignments.splice(assignmentIndex, 1);
+    if (assignments.length === 0) delete schedule[fromBlockKey];
+    if (!schedule[newBlockKey]) schedule[newBlockKey] = [];
+    schedule[newBlockKey].push({
+        member: toMember.name,
+        client: assignment.client
+    });
+    const blockId = newBlockId;
+    if (!timeBlocks.find(b => b.id === blockId)) {
+        const st = Math.floor(startMinutes / 60);
+        const sm = startMinutes % 60;
+        const et = Math.floor(endMinutes / 60);
+        const em = endMinutes % 60;
+        timeBlocks.push({
+            id: blockId,
+            label: `${String(st).padStart(2,'0')}:${String(sm).padStart(2,'0')} - ${String(et).padStart(2,'0')}:${String(em).padStart(2,'0')}`,
+            time: '',
+            startTime: `${String(st).padStart(2,'0')}:${String(sm).padStart(2,'0')}`,
+            endTime: `${String(et).padStart(2,'0')}:${String(em).padStart(2,'0')}`,
+            isLunch: false
+        });
+    }
+    saveData();
+    renderSidebar();
+    if (isLeadershipMode) updateStats();
+    renderCalendar();
+    updateStats();
 }
 
 // Delete leadership time entry (global function for onclick)

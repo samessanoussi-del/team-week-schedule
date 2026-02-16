@@ -420,9 +420,26 @@ body.bright-theme .client-option:hover {
     position: absolute;
     left: 50%;
     transform: translateX(-50%);
-    display: flex;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
     align-items: center;
     gap: 1rem;
+    min-width: 280px;
+}
+.header-week-nav {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.header-week-nav-left {
+    justify-content: flex-end;
+}
+.header-week-nav-right {
+    justify-content: flex-start;
+}
+.btn-nav-arrow {
+    padding: 0.5rem 0.75rem;
+    min-width: 2.5rem;
 }
 
 .header-controls {
@@ -2524,7 +2541,7 @@ body.bright-theme .workblocks-row {
     font-size: 0.9rem;
 }
 .btn-current-week {
-    margin-left: 0.5rem;
+    margin-left: 0;
 }
 
 /* Settings: prevent button overlap on 1080p / smaller widths */

@@ -38,10 +38,14 @@
         <header class="header">
             <h1>Team Week Schedule</h1>
             <div class="header-center">
-                <button id="prevWeek" class="btn-nav">← Previous Week</button>
+                <div class="header-week-nav header-week-nav-left">
+                    <button id="prevWeek" class="btn-nav btn-nav-arrow" title="Previous week" aria-label="Previous week">←</button>
+                </div>
                 <span id="weekDisplay" class="week-display"></span>
-                <button id="nextWeek" class="btn-nav">Next Week →</button>
-                <button id="goToCurrentWeekBtn" class="btn-nav btn-current-week" title="Go to current week" style="display: none;">Today</button>
+                <div class="header-week-nav header-week-nav-right">
+                    <button id="nextWeek" class="btn-nav btn-nav-arrow" title="Next week" aria-label="Next week">→</button>
+                    <button id="goToCurrentWeekBtn" class="btn-nav btn-current-week" title="Go to current week" aria-label="Go to current week" style="display: none;">Today</button>
+                </div>
             </div>
             <div class="header-controls">
                 <div id="onlineUsersStrip" class="online-users-strip" title="People currently viewing"></div>

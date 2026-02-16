@@ -232,7 +232,6 @@
             </div>
             <div class="modal-body">
                 <div class="profile-form">
-                    <button type="button" id="profileSaveBtn" class="btn-primary profile-save-main">Save</button>
                     <p class="profile-save-hint">Change your details below, then click Save. Your online avatar updates when you save.</p>
                     <div class="profile-picture-section">
                         <label>Profile picture</label>
@@ -245,13 +244,15 @@
                     <input type="text" id="profileFirstName" class="input-field" placeholder="First name">
                     <label>Last name</label>
                     <input type="text" id="profileLastName" class="input-field" placeholder="Last name">
-                    <button type="button" id="profileSaveBtnBottom" class="btn-primary" style="margin-top: 0.5rem;">Save profile</button>
                     <hr style="margin: 1rem 0;">
                     <label>Change password</label>
                     <input type="password" id="profileNewPassword" class="input-field" placeholder="New password">
                     <button type="button" id="profileChangePasswordBtn" class="btn-primary" style="margin-top: 0.5rem;">Update password</button>
                     <hr style="margin: 1rem 0;">
-                    <button type="button" id="profileSignOutBtn" class="btn-primary" style="background: #dc3545;">Sign out</button>
+                    <div class="profile-modal-actions">
+                        <button type="button" id="profileSignOutBtn" class="btn-primary profile-action-btn" style="background: #dc3545;">Sign out</button>
+                        <button type="button" id="profileSaveBtn" class="btn-primary profile-action-btn">Save</button>
+                    </div>
                 </div>
             </div>
         </div>

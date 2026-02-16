@@ -65,10 +65,15 @@ function setupAuthListeners() {
 }
 
 // Profile stored online (Supabase). Run ADD_USER_PROFILES.sql in Supabase to create the table.
+function getSupabaseClient() {
+    return (typeof window !== 'undefined' && window.supabaseClient) || (typeof supabase !== 'undefined' && supabase && typeof supabase.from === 'function' ? supabase : null);
+}
+
 async function loadProfileFromSupabase(email) {
-    if (typeof supabase === 'undefined' || !email) return null;
+    const client = getSupabaseClient();
+    if (!client || !email) return null;
     try {
-        const { data, error } = await supabase.from('user_profiles').select('first_name, last_name, profile_picture_url, avatar_border_color').eq('email', email).maybeSingle();
+        const { data, error } = await client.from('user_profiles').select('first_name, last_name, profile_picture_url, avatar_border_color').eq('email', email).maybeSingle();
         if (error) {
             console.warn('Profile load from Supabase:', error.message);
             return null;
@@ -81,9 +86,10 @@ async function loadProfileFromSupabase(email) {
 }
 
 async function saveProfileToSupabase(profile) {
-    if (typeof supabase === 'undefined' || !profile || !profile.email) return false;
+    const client = getSupabaseClient();
+    if (!client || !profile || !profile.email) return false;
     try {
-        const { error } = await supabase.from('user_profiles').upsert({
+        const { error } = await client.from('user_profiles').upsert({
             email: profile.email,
             first_name: profile.firstName || null,
             last_name: profile.lastName || null,
@@ -2331,7 +2337,7 @@ function setupEventListeners() {
             avatarBorderColor: currentUser.avatarBorderColor
         });
         if (!saved) {
-            if (typeof alert !== 'undefined') alert('Could not save to server. Check connection and that the user_profiles table exists in Supabase (run ADD_USER_PROFILES.sql).');
+            if (typeof alert !== 'undefined') alert('Could not save to server. In Supabase: run ADD_USER_PROFILES.sql and set your Project URL + anon key in supabase-config.js (see SUPABASE_SETUP.md).');
             return;
         }
         localStorage.setItem('teamScheduleUser', JSON.stringify(currentUser));
@@ -2393,10 +2399,8 @@ function setupEventListeners() {
             alert('Password updated.');
         });
     }
-    ['profileSaveBtn', 'profileSaveBtnBottom'].forEach(id => {
-        const btn = document.getElementById(id);
-        if (btn) btn.addEventListener('click', saveProfileAndClose);
-    });
+    const profileSaveBtn = document.getElementById('profileSaveBtn');
+    if (profileSaveBtn) profileSaveBtn.addEventListener('click', saveProfileAndClose);
     const profileAvatarBorderColorEl = document.getElementById('profileAvatarBorderColor');
     if (profileAvatarBorderColorEl) {
         profileAvatarBorderColorEl.addEventListener('input', () => {

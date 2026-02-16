@@ -106,6 +106,42 @@ CREATE POLICY "Allow all operations on weekly_time_tracking" ON weekly_time_trac
 CREATE INDEX IF NOT EXISTS idx_weekly_time_tracking_week_key ON weekly_time_tracking(week_key);
 ```
 
+## Profile save and "Who is online"
+
+### Profile save (Save in profile modal)
+
+For **Save** in the profile window to work:
+
+1. **Create the `user_profiles` table**  
+   In Supabase → **SQL Editor**, run the script in **`ADD_USER_PROFILES.sql`** (creates the table and RLS so the app can read/write profiles).
+
+2. **Use the correct API key**  
+   In **`supabase-config.js`**, set:
+   - `SUPABASE_URL` = your project’s **Project URL** (Supabase → Settings → API).
+   - `SUPABASE_ANON_KEY` = your project’s **anon public** key (long JWT starting with `eyJ...`).  
+   If you still have a placeholder like `sb_publishable_...`, replace it with the real anon key from the dashboard.
+
+3. **Script order**  
+   In your HTML, load in this order: Supabase JS from CDN → `supabase-config.js` → `app.js`.
+
+If Save still fails, open the browser console (F12) and check for Supabase errors (e.g. "relation user_profiles does not exist", or 401/403).
+
+### Who is online (avatar strip in the header)
+
+The strip to the **left of "Leadership Members"** currently shows **only your own** avatar (from your profile). It does **not** yet show other people who are online.
+
+To show **other users** who are viewing the app you would need one of these, **outside Cursor** (in Supabase and/or your app):
+
+- **Option A – Supabase Realtime Presence**  
+  Use a Realtime channel and Presence so each tab tracks "I’m here" and the app subscribes to presence changes. This requires:
+  - Realtime enabled for your project.
+  - Code that joins a channel with presence and that renders other users from presence state (this is not implemented in the app yet).
+
+- **Option B – Custom “online users” table**  
+  A table like `online_users` (e.g. user id, last_seen, etc.) that the app updates on a timer and reads to show who’s online. You’d need to create the table and add the sync logic.
+
+So: **Profile Save** = set up Supabase (table + anon key) as above. **Who is online** = right now only you; to see others, Supabase (and possibly extra code) is needed as above.
+
 ## Step 4: Enable Realtime
 
 1. In your Supabase dashboard, go to "Database" → "Replication"

@@ -2532,16 +2532,22 @@ body.bright-theme .online-users-strip .online-avatar {
     padding: 0.6rem;
 }
 
-.profile-save-main {
-    width: 100%;
-    padding: 0.75rem 1.5rem;
-    font-size: 1rem;
-    font-weight: 600;
-    margin-bottom: 0.5rem;
-}
 .profile-save-hint {
     font-size: 0.85rem;
     color: #888;
     margin: 0 0 1rem 0;
+}
+
+.profile-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.profile-action-btn {
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+    min-width: 5rem;
 }
 

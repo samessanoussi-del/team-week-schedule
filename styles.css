@@ -2415,6 +2415,7 @@ body.bright-theme .leadership-hour-cell:hover {
     margin-top: 1rem;
     display: flex;
     flex-direction: column;
+    max-height: 60vh;
 }
 .dashboard-layout,
 .settings-layout {

@@ -65,6 +65,32 @@ function setupAuthListeners() {
     });
 }
 
+// Resize a data URL image to max size and JPEG quality to avoid statement timeout when saving to Supabase
+function resizeProfilePictureDataUrl(dataUrl, maxPx, quality) {
+    if (!dataUrl || !dataUrl.startsWith('data:image')) return Promise.resolve(dataUrl);
+    return new Promise(function (resolve) {
+        var img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = function () {
+            var w = img.width, h = img.height;
+            if (w <= maxPx && h <= maxPx) { resolve(dataUrl); return; }
+            var scale = maxPx / Math.max(w, h);
+            var c = document.createElement('canvas');
+            c.width = Math.round(w * scale);
+            c.height = Math.round(h * scale);
+            var ctx = c.getContext('2d');
+            ctx.drawImage(img, 0, 0, c.width, c.height);
+            try {
+                resolve(c.toDataURL('image/jpeg', quality || 0.8));
+            } catch (e) {
+                resolve(dataUrl);
+            }
+        };
+        img.onerror = function () { resolve(dataUrl); };
+        img.src = dataUrl;
+    });
+}
+
 // Profile stored online (Supabase). Run ADD_USER_PROFILES.sql in Supabase to create the table.
 function getSupabaseClient() {
     return (typeof window !== 'undefined' && window.supabaseClient) || (typeof supabase !== 'undefined' && supabase && typeof supabase.from === 'function' ? supabase : null);
@@ -88,9 +114,16 @@ async function loadProfileFromSupabase(email) {
 
 async function saveProfileToSupabase(profile) {
     const client = getSupabaseClient();
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/ec7ef1a8-7389-4213-a659-4b03335bac18',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:saveProfileToSupabase',message:'saveProfileToSupabase called',data:{hasClient:!!client,hasProfile:!!profile,email:profile&&profile.email?profile.email.substring(0,3)+'...':null},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{});
+    // #endregion
     if (!client || !profile || !profile.email) {
         return { ok: false, message: 'Not connected to Supabase. Check supabase-config.js and that the script loads.' };
     }
+    const picLen = (profile.profilePictureUrl && profile.profilePictureUrl.length) || 0;
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/ec7ef1a8-7389-4213-a659-4b03335bac18',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:saveProfileToSupabase',message:'payload before upsert',data:{profilePictureUrlLength:picLen,isDataUrl:!!(profile.profilePictureUrl&&profile.profilePictureUrl.startsWith('data:'))},timestamp:Date.now(),hypothesisId:'H3'})}).catch(()=>{});
+    // #endregion
     try {
         const { error } = await client.from('user_profiles').upsert({
             email: profile.email,
@@ -102,9 +135,14 @@ async function saveProfileToSupabase(profile) {
         }, { onConflict: 'email' });
         if (error) {
             console.error('Profile save to Supabase:', error);
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/ec7ef1a8-7389-4213-a659-4b03335bac18',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:saveProfileToSupabase',message:'Supabase upsert error',data:{errorMessage:error.message||'',errorCode:error.code||''},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{});
+            // #endregion
             const msg = error.message || String(error.code || '');
-            const hint = msg.includes('user_profiles') || msg.includes('does not exist')
+            const hint = msg.includes('user_profiles') || msg.includes('does not exist') || msg.includes('schema cache')
                 ? ' Run ADD_USER_PROFILES.sql in Supabase SQL Editor (see that file in your project).'
+                : msg.includes('timeout')
+                ? ' Your profile picture may be too large; try a smaller image or the app will resize it automatically on next save.'
                 : '';
             return { ok: false, message: (msg || 'Server rejected the save.') + hint };
         }
@@ -112,8 +150,10 @@ async function saveProfileToSupabase(profile) {
     } catch (e) {
         console.error('Profile save error:', e);
         const msg = e && e.message ? e.message : String(e);
-        const hint = msg.includes('user_profiles') || msg.includes('does not exist')
+        const hint = msg.includes('user_profiles') || msg.includes('does not exist') || msg.includes('schema cache')
             ? ' Run ADD_USER_PROFILES.sql in Supabase SQL Editor.'
+            : msg.includes('timeout')
+            ? ' Your profile picture may be too large; try a smaller image or the app will resize it automatically on next save.'
             : '';
         return { ok: false, message: (msg || 'Network or connection error.') + hint };
     }
@@ -2019,25 +2059,32 @@ function renderSettings() {
     });
 }
 
-// Online users strip: shows everyone currently online (from Supabase online_users), or just you
+// Online users strip: Google Docs style — 1 = single circle, 2–3 = overlapping, 4+ = stacked with +N
 function renderOnlineUsersStrip() {
     const strip = document.getElementById('onlineUsersStrip');
     if (!strip) return;
     strip.innerHTML = '';
     const list = onlineUsersFromServer.length > 0 ? onlineUsersFromServer : (currentUser ? [currentUser] : []);
-    list.forEach(user => {
+    const count = list.length;
+    const overlap = count >= 2;
+    const showOverlapClass = overlap ? ' online-avatar-wrap-overlap' : '';
+    const maxVisible = 3;
+    const visible = count <= maxVisible ? list : list.slice(0, maxVisible);
+    const extraCount = count > maxVisible ? count - maxVisible : 0;
+
+    visible.forEach((user, index) => {
+        const wrap = document.createElement('span');
+        wrap.className = 'online-avatar-wrap' + showOverlapClass;
+        wrap.title = (currentUser && user.email === currentUser.email) ? 'You' : (user.firstName || user.lastName || user.email || '?');
         const borderColor = user.avatarBorderColor || '#318cc3';
         const displayName = user.firstName || user.lastName || user.email || '?';
-        const isYou = currentUser && user.email === currentUser.email;
-        const span = document.createElement('span');
-        span.title = isYou ? 'You' : displayName;
         if (user.profilePictureUrl) {
             const img = document.createElement('img');
             img.src = user.profilePictureUrl;
             img.alt = displayName;
             img.className = 'online-avatar';
             img.style.borderColor = borderColor;
-            span.appendChild(img);
+            wrap.appendChild(img);
         } else {
             const circle = document.createElement('div');
             circle.className = 'online-avatar';
@@ -2049,10 +2096,21 @@ function renderOnlineUsersStrip() {
             circle.style.color = 'var(--dark-text)';
             circle.style.borderColor = borderColor;
             circle.textContent = (displayName).charAt(0).toUpperCase();
-            span.appendChild(circle);
+            wrap.appendChild(circle);
         }
-        strip.appendChild(span);
+        strip.appendChild(wrap);
     });
+
+    if (extraCount > 0) {
+        const wrap = document.createElement('span');
+        wrap.className = 'online-avatar-wrap' + showOverlapClass;
+        wrap.title = extraCount + ' more viewing';
+        const more = document.createElement('div');
+        more.className = 'online-avatar online-avatar-more';
+        more.textContent = '+' + extraCount;
+        wrap.appendChild(more);
+        strip.appendChild(wrap);
+    }
 }
 
 // Count workblocks per client (for Dashboard)
@@ -2396,11 +2454,16 @@ function setupEventListeners() {
         currentUser.firstName = firstName;
         currentUser.lastName = lastName;
         if (borderColorEl) currentUser.avatarBorderColor = borderColorEl.value || '#318cc3';
+        var picToSave = currentUser.profilePictureUrl;
+        if (picToSave && picToSave.startsWith('data:') && picToSave.length > 150000) {
+            picToSave = await resizeProfilePictureDataUrl(picToSave, 200, 0.8);
+            currentUser.profilePictureUrl = picToSave;
+        }
         const result = await saveProfileToSupabase({
             email: currentUser.email,
             firstName: currentUser.firstName,
             lastName: currentUser.lastName,
-            profilePictureUrl: currentUser.profilePictureUrl,
+            profilePictureUrl: picToSave,
             avatarBorderColor: currentUser.avatarBorderColor
         });
         if (!result.ok) {

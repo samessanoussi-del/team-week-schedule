@@ -2458,13 +2458,23 @@ body.bright-theme .workblocks-row {
     margin-left: 0.5rem;
 }
 
-/* Online users strip (Google Docs style) */
+/* Online users strip (Google Docs style: 1 = single, 2–3 = overlapping, 4+ = stacked with +N) */
 .online-users-strip {
     display: flex;
     align-items: center;
-    gap: 4px;
+    justify-content: center;
     margin-right: 0.5rem;
-    min-width: 40px;
+    min-width: 36px;
+    height: 36px;
+}
+.online-avatar-wrap {
+    flex-shrink: 0;
+}
+.online-avatar-wrap-overlap {
+    margin-left: -10px;
+}
+.online-avatar-wrap-overlap:first-child {
+    margin-left: 0;
 }
 .online-users-strip .online-avatar {
     width: 36px;
@@ -2474,8 +2484,22 @@ body.bright-theme .workblocks-row {
     border: 2px solid var(--dark-primary);
     background: var(--dark-sidebar);
     box-sizing: border-box;
+    display: block;
+}
+.online-users-strip .online-avatar-more {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--dark-text);
+    border-color: var(--dark-primary);
 }
 body.bright-theme .online-users-strip .online-avatar {
+    border-color: var(--bright-primary);
+}
+body.bright-theme .online-users-strip .online-avatar-more {
+    color: var(--bright-text);
     border-color: var(--bright-primary);
 }
 

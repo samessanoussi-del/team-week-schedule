@@ -3804,8 +3804,8 @@ function renderLeadershipMode() {
                     return;
                 }
             }
-            // Don't start create-flow when interacting with an entry (edit/drag handled on the entry)
-            if (e.target.closest('.leadership-time-entry') && !e.target.classList.contains('leadership-time-entry-delete')) {
+            // Don't start create-flow when interacting with an entry (edit, delete, or drag)
+            if (e.target.closest('.leadership-time-entry')) {
                 return;
             }
 

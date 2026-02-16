@@ -256,27 +256,44 @@ function getContrastTextColor(backgroundColor) {
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log('🚀 Initializing app...');
     const authScreen = document.getElementById('authScreen');
     const appContainer = document.getElementById('appContainer');
-    const hasAuthGate = authScreen && appContainer;
+    const authSubtitle = document.getElementById('authSubtitle');
+    function showAuth(msg) {
+        if (authScreen) authScreen.style.display = 'flex';
+        if (appContainer) appContainer.style.display = 'none';
+        if (authSubtitle && msg) authSubtitle.textContent = msg;
+    }
+    function showApp() {
+        if (authScreen) authScreen.style.display = 'none';
+        if (appContainer) appContainer.style.display = 'flex';
+    }
     try {
-        if (hasAuthGate) {
-            let storedUser = JSON.parse(localStorage.getItem('teamScheduleUser') || 'null');
-            if (storedUser && storedUser.email) {
+        console.log('🚀 Initializing app...');
+        if (!authScreen || !appContainer) {
+            showAuth('Sign in or create an account to continue');
+            if (appContainer) appContainer.style.display = 'flex';
+            return;
+        }
+        let storedUser = null;
+        try {
+            storedUser = JSON.parse(localStorage.getItem('teamScheduleUser') || 'null');
+        } catch (_) {}
+        if (storedUser && storedUser.email) {
+            try {
                 const users = JSON.parse(localStorage.getItem('teamScheduleUsers') || '{}');
                 const latest = users[storedUser.email];
                 if (latest) {
                     storedUser = { ...storedUser, profilePictureUrl: latest.profilePictureUrl || storedUser.profilePictureUrl, avatarBorderColor: latest.avatarBorderColor || storedUser.avatarBorderColor, firstName: latest.firstName ?? storedUser.firstName, lastName: latest.lastName ?? storedUser.lastName };
                 }
-            }
-            currentUser = storedUser;
-            if (!currentUser) {
-                authScreen.style.display = 'flex';
-                appContainer.style.display = 'none';
-                setupAuthListeners();
-                return;
-            }
+            } catch (_) {}
+        }
+        currentUser = storedUser;
+        if (!currentUser || !currentUser.email) {
+            setupAuthListeners();
+            return;
+        }
+        try {
             const profileFromSupabase = await loadProfileFromSupabase(currentUser.email);
             if (profileFromSupabase) {
                 currentUser.firstName = profileFromSupabase.first_name ?? currentUser.firstName;
@@ -284,41 +301,30 @@ document.addEventListener('DOMContentLoaded', async () => {
                 currentUser.profilePictureUrl = profileFromSupabase.profile_picture_url ?? currentUser.profilePictureUrl;
                 currentUser.avatarBorderColor = profileFromSupabase.avatar_border_color ?? currentUser.avatarBorderColor;
             }
-            authScreen.style.display = 'none';
-            appContainer.style.display = 'flex';
-        } else {
-            if (appContainer) appContainer.style.display = 'flex';
-        }
+        } catch (_) {}
+        showApp();
         await loadData();
         initializeCalendar();
         setupEventListeners();
         renderSidebar();
         renderSettings();
         updateStats();
-        setTimeout(() => setupRealtimeSubscriptions(), 1500);
+        setTimeout(() => { try { setupRealtimeSubscriptions(); } catch (_) {} }, 1500);
         renderTimeTracking();
         updateDayHeaders();
         renderOnlineUsersStrip();
         if (currentUser) {
-            updateMyOnlinePresence();
-            fetchOnlineUsers();
-            setInterval(updateMyOnlinePresence, 30000);
-            setInterval(fetchOnlineUsers, 30000);
+            try { updateMyOnlinePresence(); } catch (_) {}
+            try { fetchOnlineUsers(); } catch (_) {}
+            setInterval(() => { try { updateMyOnlinePresence(); } catch (_) {} }, 30000);
+            setInterval(() => { try { fetchOnlineUsers(); } catch (_) {} }, 30000);
         }
         console.log('✅ App initialized');
-        setInterval(() => {
-            updateDayHeaders();
-            renderCalendar();
-        }, 60000);
+        setInterval(() => { updateDayHeaders(); renderCalendar(); }, 60000);
     } catch (err) {
         console.error('App init error:', err);
-        if (authScreen) authScreen.style.display = 'flex';
-        if (appContainer) appContainer.style.display = 'none';
-        setupAuthListeners();
-        if (authScreen) {
-            const sub = authScreen.querySelector('.auth-subtitle');
-            if (sub) sub.textContent = 'Something went wrong. Try signing in again or refresh the page.';
-        }
+        showAuth('Something went wrong. Try signing in again or refresh the page.');
+        try { setupAuthListeners(); } catch (_) {}
     }
 });
 

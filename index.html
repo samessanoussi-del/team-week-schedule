@@ -9,11 +9,11 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
 <body>
-    <!-- Auth gate (sign up / sign in) -->
-    <div id="authScreen" class="auth-screen" style="display: none;">
+    <!-- Auth gate: visible by default so page is never blank if JS fails -->
+    <div id="authScreen" class="auth-screen" style="display: flex;">
         <div class="auth-box">
             <h1>Team Week Schedule</h1>
-            <p class="auth-subtitle">Sign in or create an account to continue</p>
+            <p class="auth-subtitle" id="authSubtitle">Sign in or create an account to continue</p>
             <div id="authTabs" class="auth-tabs">
                 <button type="button" class="auth-tab active" data-tab="signin">Sign in</button>
                 <button type="button" class="auth-tab" data-tab="signup">Sign up</button>

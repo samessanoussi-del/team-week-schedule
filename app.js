@@ -87,7 +87,9 @@ async function loadProfileFromSupabase(email) {
 
 async function saveProfileToSupabase(profile) {
     const client = getSupabaseClient();
-    if (!client || !profile || !profile.email) return false;
+    if (!client || !profile || !profile.email) {
+        return { ok: false, message: 'Not connected to Supabase. Check supabase-config.js and that the script loads.' };
+    }
     try {
         const { error } = await client.from('user_profiles').upsert({
             email: profile.email,
@@ -99,12 +101,20 @@ async function saveProfileToSupabase(profile) {
         }, { onConflict: 'email' });
         if (error) {
             console.error('Profile save to Supabase:', error);
-            return false;
+            const msg = error.message || String(error.code || '');
+            const hint = msg.includes('user_profiles') || msg.includes('does not exist')
+                ? ' Run ADD_USER_PROFILES.sql in Supabase SQL Editor (see that file in your project).'
+                : '';
+            return { ok: false, message: (msg || 'Server rejected the save.') + hint };
         }
-        return true;
+        return { ok: true };
     } catch (e) {
         console.error('Profile save error:', e);
-        return false;
+        const msg = e && e.message ? e.message : String(e);
+        const hint = msg.includes('user_profiles') || msg.includes('does not exist')
+            ? ' Run ADD_USER_PROFILES.sql in Supabase SQL Editor.'
+            : '';
+        return { ok: false, message: (msg || 'Network or connection error.') + hint };
     }
 }
 
@@ -2329,15 +2339,15 @@ function setupEventListeners() {
         currentUser.firstName = firstName;
         currentUser.lastName = lastName;
         if (borderColorEl) currentUser.avatarBorderColor = borderColorEl.value || '#318cc3';
-        const saved = await saveProfileToSupabase({
+        const result = await saveProfileToSupabase({
             email: currentUser.email,
             firstName: currentUser.firstName,
             lastName: currentUser.lastName,
             profilePictureUrl: currentUser.profilePictureUrl,
             avatarBorderColor: currentUser.avatarBorderColor
         });
-        if (!saved) {
-            if (typeof alert !== 'undefined') alert('Could not save to server. In Supabase: run ADD_USER_PROFILES.sql and set your Project URL + anon key in supabase-config.js (see SUPABASE_SETUP.md).');
+        if (!result.ok) {
+            if (typeof alert !== 'undefined') alert('Could not save to server.\n\n' + (result.message || 'Check SUPABASE_SETUP.md and run ADD_USER_PROFILES.sql in Supabase SQL Editor.'));
             return;
         }
         localStorage.setItem('teamScheduleUser', JSON.stringify(currentUser));
@@ -2351,7 +2361,7 @@ function setupEventListeners() {
         localStorage.setItem('teamScheduleUsers', JSON.stringify(users));
         renderOnlineUsersStrip();
         document.getElementById('profileModal').classList.remove('show');
-        if (typeof alert !== 'undefined') alert('Saved! Your profile is stored online and your avatar is updated.');
+        if (typeof alert !== 'undefined') alert('Profile saved successfully. Your changes are stored online and your avatar is updated.');
     }
     const profileBtn = document.getElementById('profileBtn');
     if (profileBtn) {

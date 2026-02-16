@@ -3867,8 +3867,11 @@ function renderLeadershipMode() {
                 memberIndex: memberIndex
             };
             
-            // Visual feedback
+            // Visual feedback and document listeners so drag always works
             memberColumn.style.cursor = 'ns-resize';
+            updateLeadershipDragPreview();
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseup', handleMouseUp, { once: true });
         });
         
         // Add global mouse handlers for drag (on document to catch mouseup outside column)
@@ -3928,6 +3931,7 @@ function renderLeadershipMode() {
             if (leadershipDragState && leadershipDragState.memberIndex === memberIndex) {
                 const finalStart = leadershipDragState.startMinutes;
                 const finalEnd = Math.min(1200, finalStart + 60);
+                document.querySelectorAll('.leadership-drag-preview').forEach(el => el.remove());
                 if (finalEnd > finalStart) {
                     showLeadershipClientModal(memberIndex, finalStart, finalEnd);
                 }
@@ -3945,16 +3949,6 @@ function renderLeadershipMode() {
                 document.removeEventListener('mouseup', handleMouseUp);
             }
         };
-        
-        // Add document-level listeners when mousedown happens
-        memberColumn.addEventListener('mousedown', (e) => {
-            // Only add if it's not a resize or entry click
-            if (!e.target.classList.contains('leadership-time-entry-resize-handle') && 
-                !e.target.closest('.leadership-time-entry')) {
-                document.addEventListener('mousemove', handleMouseMove);
-                document.addEventListener('mouseup', handleMouseUp, { once: true });
-            }
-        });
         
         // Handle mouse leave to clean up resize
         memberColumn.addEventListener('mouseleave', () => {
@@ -4250,11 +4244,12 @@ function saveLeadershipTimeEntry(oldBlockKey, assignmentIndex, startMinutes, end
     }
 }
 
-// Close leadership client modal
+// Close leadership client modal (e.g. user clicks overlay without selecting a client)
 function closeLeadershipClientModal() {
     const modal = document.getElementById('leadershipClientModal');
     modal.classList.remove('show');
     window.leadershipPendingEntry = null;
+    document.querySelectorAll('.leadership-drag-preview').forEach(el => el.remove());
 }
 
 // Create time entry in leadership mode (minute-based). Always creates 1-hour blocks.

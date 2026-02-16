@@ -1952,7 +1952,6 @@ function renderSidebar() {
     membersToShow.forEach(member => {
         const item = document.createElement('div');
         item.className = 'draggable-item';
-        item.draggable = isAdminMode;
         const profileDisplay = member.profilePicture ? 
             `<img src="${member.profilePicture}" alt="${member.name}" class="sidebar-profile-picture">` : 
             `<div class="sidebar-profile-initial">${member.name.charAt(0).toUpperCase()}</div>`;
@@ -1964,8 +1963,9 @@ function renderSidebar() {
         `;
         item.dataset.type = 'member';
         item.dataset.value = member.name;
+        item.draggable = isAdminMode || isLeadershipMode;
         
-        if (isAdminMode) {
+        if (isAdminMode || isLeadershipMode) {
             item.addEventListener('dragstart', (e) => {
                 e.dataTransfer.setData('text/plain', `member:${member.name}`);
                 item.classList.add('dragging');
@@ -3738,9 +3738,12 @@ function renderLeadershipMode() {
         memberColumn.className = 'leadership-member-column';
         memberColumn.dataset.memberIndex = memberIndex;
         
+        // Allow placement in leadership view when admin or when viewing leadership calendar
+        const canEditLeadership = isAdminMode || isLeadershipMode;
+
         // Add global mouse handlers for this column (minute-based)
         memberColumn.addEventListener('mousedown', (e) => {
-            if (!isAdminMode) return;
+            if (!canEditLeadership) return;
             // Check if clicking on resize handle
             if (e.target.classList.contains('leadership-time-entry-resize-handle')) {
                 const entry = e.target.closest('.leadership-time-entry');
@@ -3903,6 +3906,33 @@ function renderLeadershipMode() {
             
             memberColumn.appendChild(hourCell);
         });
+
+        // Make column accept drop from sidebar (drag member onto this column)
+        memberColumn.addEventListener('dragover', (e) => {
+            if (!canEditLeadership) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+            memberColumn.classList.add('drag-over');
+        });
+        memberColumn.addEventListener('dragleave', () => {
+            memberColumn.classList.remove('drag-over');
+        });
+        memberColumn.addEventListener('drop', (e) => {
+            if (!canEditLeadership) return;
+            e.preventDefault();
+            memberColumn.classList.remove('drag-over');
+            const data = e.dataTransfer.getData('text/plain');
+            if (!data || !data.startsWith('member:')) return;
+            const memberName = data.replace(/^member:/, '');
+            const membersToUse = isLeadershipMode ? leadershipMembers : teamMembers;
+            const dropMemberIndex = membersToUse.findIndex(m => m.name === memberName);
+            if (dropMemberIndex === -1) return;
+            const columnRect = memberColumn.getBoundingClientRect();
+            const relativeY = e.clientY - columnRect.top;
+            const startMinutes = Math.max(480, Math.min(1200, Math.round(relativeY)));
+            const endMinutes = Math.min(1200, startMinutes + 60);
+            showLeadershipClientModal(dropMemberIndex, startMinutes, endMinutes);
+        });
         
         grid.appendChild(memberColumn);
     });
@@ -4000,7 +4030,7 @@ function renderAllLeadershipTimeEntries() {
                 // Create time entry with minute-based positioning
                 const entry = document.createElement('div');
                 entry.className = 'leadership-time-entry';
-                if (isAdminMode) {
+                if (isAdminMode || isLeadershipMode) {
                     entry.classList.add('editable');
                 }
                 const client = clients.find(c => c.name === assignment.client);
@@ -4017,11 +4047,12 @@ function renderAllLeadershipTimeEntries() {
                 const mins = duration % 60;
                 const durationText = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
                 
+                const canEdit = isAdminMode || isLeadershipMode;
                 entry.innerHTML = `
-                    ${isAdminMode ? '<div class="leadership-time-entry-resize-handle top"></div>' : ''}
+                    ${canEdit ? '<div class="leadership-time-entry-resize-handle top"></div>' : ''}
                     <span>${assignment.client} (${durationText})</span>
-                    ${isAdminMode ? '<button class="leadership-time-entry-delete" onclick="deleteLeadershipTimeEntry(event, \'' + blockKey + '\', ' + assignmentIdx + ')">&times;</button>' : ''}
-                    ${isAdminMode ? '<div class="leadership-time-entry-resize-handle bottom"></div>' : ''}
+                    ${canEdit ? '<button class="leadership-time-entry-delete" onclick="deleteLeadershipTimeEntry(event, \'' + blockKey + '\', ' + assignmentIdx + ')">&times;</button>' : ''}
+                    ${canEdit ? '<div class="leadership-time-entry-resize-handle bottom"></div>' : ''}
                 `;
                 memberColumn.appendChild(entry);
             });
@@ -4031,7 +4062,7 @@ function renderAllLeadershipTimeEntries() {
 
 // Show client selection modal for leadership mode (minute-based)
 function showLeadershipClientModal(memberIndex, startMinutes, endMinutes) {
-    if (!isAdminMode) return;
+    if (!isAdminMode && !isLeadershipMode) return;
     
     const modal = document.getElementById('leadershipClientModal');
     const clientList = document.getElementById('leadershipClientSelectionList');
@@ -4063,7 +4094,7 @@ function showLeadershipClientModal(memberIndex, startMinutes, endMinutes) {
 
 // Show edit modal for existing entry
 function showLeadershipEditModal(entry) {
-    if (!isAdminMode) return;
+    if (!isAdminMode && !isLeadershipMode) return;
     
     const blockKey = entry.dataset.blockKey;
     const assignmentIndex = parseInt(entry.dataset.assignmentIndex);
@@ -4116,7 +4147,7 @@ function closeLeadershipClientModal() {
 
 // Create time entry in leadership mode (minute-based)
 function createLeadershipTimeEntry(memberIndex, startMinutes, endMinutes, clientName) {
-    if (!isAdminMode || !window.leadershipPendingEntry) return;
+    if ((!isAdminMode && !isLeadershipMode) || !window.leadershipPendingEntry) return;
     
     const membersToUse = isLeadershipMode ? leadershipMembers : teamMembers;
     const member = membersToUse[memberIndex];
@@ -4177,7 +4208,7 @@ function createLeadershipTimeEntry(memberIndex, startMinutes, endMinutes, client
 
 // Delete leadership time entry (global function for onclick)
 window.deleteLeadershipTimeEntry = function(event, blockKey, assignmentIndex) {
-    if (!isAdminMode) return;
+    if (!isAdminMode && !isLeadershipMode) return;
     event.stopPropagation();
     
     saveStateToHistory();

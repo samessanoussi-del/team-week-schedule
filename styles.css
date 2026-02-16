@@ -2287,6 +2287,16 @@ body.bright-theme .leadership-member-column {
     border-right-color: var(--bright-border);
 }
 
+.leadership-member-column.drag-over {
+    background: rgba(206, 40, 40, 0.08);
+    border: 2px dashed var(--dark-primary);
+}
+
+body.bright-theme .leadership-member-column.drag-over {
+    background: rgba(206, 40, 40, 0.06);
+    border-color: var(--bright-primary);
+}
+
 .leadership-hour-cell {
     height: 60px;
     border-bottom: 1px solid var(--dark-border);

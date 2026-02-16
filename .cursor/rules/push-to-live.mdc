@@ -1,21 +1,22 @@
 ---
-description: After making edits when the user asks for something, push changes to the live site (GitHub).
+description: Hard rule: after any change, always commit and push to Git.
 alwaysApply: true
 ---
 
-# Push to Live Site After Edits
+# Hard Rule: Push After Every Change
 
-When the user asks for a change or feature in this project, after completing the edits:
+**This is mandatory.** For any change the user asks you to do in this project:
 
-1. **Stage and commit** all changed files with a clear message (e.g. "Header blue", "Add X feature").
-2. **Push** to the remote so the live site (GitHub Pages) updates.
+1. **After completing the edits**, you must:
+   - Stage all changed files (`git add` for the modified files, or `git add .`).
+   - Commit with a clear message describing the change.
+   - Push to the remote (`git push`).
 
-Use the project root: `I:\My Drive\Cursor Apps\Team Week Schedule` (or the workspace path for this repo). Commands:
+2. **No exceptions.** Do not finish a task without pushing. Even small fixes or single-file edits must be committed and pushed.
 
-```bash
-git add .
-git commit -m "Brief description of changes"
-git push
-```
+3. **Commands** (use project root: `I:\My Drive\Cursor Apps\Team Week Schedule`; on Windows PowerShell use `;` instead of `&&`):
+   - `git add .` (or specific files)
+   - `git commit -m "Brief description of changes"`
+   - `git push`
 
-**Always** push after any code or asset changes—commit and push every time edits are made, so the live site stays in sync.
+Always push everything afterwards so the live site (e.g. GitHub Pages) stays in sync.

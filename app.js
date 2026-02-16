@@ -2,10 +2,15 @@
 let teamMembers = []; // Format: [{ name: "John", color: "#ce2828", profilePicture: "data:image/..." }, ...]
 let leadershipMembers = []; // Format: [{ name: "John", color: "#ce2828", profilePicture: "data:image/..." }, ...]
 let clients = []; // Format: [{ name: "Client A", color: "#667eea" }, ...]
-let schedule = {}; // Format: { "2024-01-15-Monday-Work1": [{ member: "John", client: "Client A" }, ...] }
+let schedule = {}; // Production only: { "2024-01-15-Monday-Work1": [{ member: "John", client: "Client A" }, ...] }
+let leadershipSchedule = {}; // Leadership only: { "2024-01-15-Monday-leadership-480-540": [{ member: "Jane", client: "Client A" }, ...] }
 let currentWeekStart = new Date();
 let isDarkTheme = true; // Default to dark theme
-let timeBlocks = []; // Format: [{ id: 'Work1', label: 'Work Block 1', time: '11:00 AM - 1:00 PM', startTime: '11:00', endTime: '13:00', isLunch: false }, ...]
+let timeBlocks = []; // Production blocks only (Work1, Work2, Work3, Lunch) - no leadership blocks
+
+function isLeadershipBlockKey(key) {
+    return typeof key === 'string' && key.indexOf('-leadership-') !== -1;
+}
 let isAdminMode = false; // View mode by default
 const ADMIN_PASSWORD = 'Ravie2026';
 let weeklyTimeTracking = {}; // Format: { "2024-01-15": { "John": { "Client A": 5.5 }, ... }, ... }
@@ -555,20 +560,40 @@ async function loadClients(skipDefaults = false) {
     }
 }
 
+// Split loaded schedule into production (schedule) and leadership (leadershipSchedule)
+function splitScheduleAfterLoad(raw) {
+    schedule = {};
+    leadershipSchedule = {};
+    Object.keys(raw).forEach(key => {
+        const arr = raw[key] && !Array.isArray(raw[key]) ? [raw[key]] : (raw[key] || []);
+        if (isLeadershipBlockKey(key)) {
+            leadershipSchedule[key] = arr;
+        } else {
+            schedule[key] = arr;
+        }
+    });
+}
+
 // Load schedule from Supabase
 async function loadSchedule() {
     // Check if supabase is available
     if (typeof supabase === 'undefined') {
         console.warn('Supabase not available, using localStorage');
         const savedSchedule = localStorage.getItem('schedule');
+        const savedLeadership = localStorage.getItem('leadershipSchedule');
         if (savedSchedule) {
-            schedule = JSON.parse(savedSchedule);
-            // Migrate old single assignment format to array format
-            Object.keys(schedule).forEach(key => {
-                if (schedule[key] && !Array.isArray(schedule[key])) {
-                    schedule[key] = [schedule[key]];
-                }
+            const raw = JSON.parse(savedSchedule);
+            Object.keys(raw).forEach(key => {
+                if (raw[key] && !Array.isArray(raw[key])) raw[key] = [raw[key]];
             });
+            splitScheduleAfterLoad(raw);
+        } else {
+            schedule = {};
+            leadershipSchedule = {};
+        }
+        if (savedLeadership) {
+            const lead = JSON.parse(savedLeadership);
+            Object.assign(leadershipSchedule, lead);
         }
         return;
     }
@@ -580,24 +605,28 @@ async function loadSchedule() {
 
         if (error) throw error;
 
-        schedule = {};
+        const raw = {};
         if (data && data.length > 0) {
             data.forEach(row => {
-                schedule[row.block_key] = row.assignments;
+                raw[row.block_key] = row.assignments;
             });
         }
+        Object.keys(raw).forEach(key => {
+            if (raw[key] && !Array.isArray(raw[key])) raw[key] = [raw[key]];
+        });
+        splitScheduleAfterLoad(raw);
     } catch (error) {
         console.error('Error loading schedule:', error);
-        // Fallback to localStorage
         const savedSchedule = localStorage.getItem('schedule');
         if (savedSchedule) {
-            schedule = JSON.parse(savedSchedule);
-            // Migrate old single assignment format to array format
-            Object.keys(schedule).forEach(key => {
-                if (schedule[key] && !Array.isArray(schedule[key])) {
-                    schedule[key] = [schedule[key]];
-                }
+            const raw = JSON.parse(savedSchedule);
+            Object.keys(raw).forEach(key => {
+                if (raw[key] && !Array.isArray(raw[key])) raw[key] = [raw[key]];
             });
+            splitScheduleAfterLoad(raw);
+        } else {
+            schedule = {};
+            leadershipSchedule = {};
         }
     }
 }
@@ -609,7 +638,8 @@ async function loadAppSettings() {
         console.warn('Supabase not available, using localStorage');
         const savedTimeBlocks = localStorage.getItem('timeBlocks');
         if (savedTimeBlocks) {
-            timeBlocks = JSON.parse(savedTimeBlocks);
+            const raw = JSON.parse(savedTimeBlocks);
+            timeBlocks = Array.isArray(raw) ? raw.filter(b => b && !b.id.startsWith('leadership-')) : [];
         } else {
             timeBlocks = [
                 { id: 'Work1', label: 'Work Block 1', time: '11:00 AM - 1:00 PM', startTime: '11:00', endTime: '13:00', isLunch: false },
@@ -651,7 +681,8 @@ async function loadAppSettings() {
         if (data) {
             data.forEach(setting => {
                 if (setting.key === 'timeBlocks') {
-                    timeBlocks = setting.value;
+                    const raw = setting.value || [];
+                    timeBlocks = Array.isArray(raw) ? raw.filter(b => b && !b.id.startsWith('leadership-')) : [];
                 } else if (setting.key === 'isDarkTheme') {
                     isDarkTheme = setting.value;
                 } else if (setting.key === 'clientDetails') {
@@ -688,10 +719,10 @@ async function loadAppSettings() {
         }
     } catch (error) {
         console.error('Error loading app settings:', error);
-        // Fallback to localStorage
         const savedTimeBlocks = localStorage.getItem('timeBlocks');
         if (savedTimeBlocks) {
-            timeBlocks = JSON.parse(savedTimeBlocks);
+            const raw = JSON.parse(savedTimeBlocks);
+            timeBlocks = Array.isArray(raw) ? raw.filter(b => b && !b.id.startsWith('leadership-')) : [];
         } else {
             timeBlocks = [
                 { id: 'Work1', label: 'Work Block 1', time: '11:00 AM - 1:00 PM', startTime: '11:00', endTime: '13:00', isLunch: false },
@@ -764,12 +795,10 @@ function saveStateToHistory() {
         teamMembers: JSON.parse(JSON.stringify(teamMembers)),
         clients: JSON.parse(JSON.stringify(clients)),
         schedule: JSON.parse(JSON.stringify(schedule)),
+        leadershipSchedule: JSON.parse(JSON.stringify(leadershipSchedule)),
         timeBlocks: JSON.parse(JSON.stringify(timeBlocks))
     };
-    
     undoHistory.push(state);
-    
-    // Limit history size
     if (undoHistory.length > maxHistorySize) {
         undoHistory.shift();
     }
@@ -782,15 +811,18 @@ function undo() {
         teamMembers = previousState.teamMembers;
         clients = previousState.clients;
         schedule = previousState.schedule;
+        if (previousState.leadershipSchedule) {
+            leadershipSchedule = previousState.leadershipSchedule;
+        }
         if (previousState.timeBlocks) {
             timeBlocks = previousState.timeBlocks;
         }
-        
         saveData();
         renderSidebar();
         renderSettings();
         renderCalendar();
         updateStats();
+        if (isLeadershipMode) renderAllLeadershipTimeEntries();
     }
 }
 
@@ -882,23 +914,21 @@ async function saveClients() {
 
 // Save schedule to Supabase
 async function saveSchedule() {
-    // Check if supabase is available
     if (typeof supabase === 'undefined') {
         localStorage.setItem('schedule', JSON.stringify(schedule));
+        localStorage.setItem('leadershipSchedule', JSON.stringify(leadershipSchedule));
         return;
     }
     
     try {
-        // Get all current schedule entries
-        const scheduleEntries = Object.keys(schedule).map(blockKey => ({
+        // Persist both production (schedule) and leadership (leadershipSchedule) in one table
+        const allKeys = [...Object.keys(schedule), ...Object.keys(leadershipSchedule)];
+        const scheduleEntries = allKeys.map(blockKey => ({
             block_key: blockKey,
-            assignments: schedule[blockKey]
+            assignments: isLeadershipBlockKey(blockKey) ? leadershipSchedule[blockKey] : schedule[blockKey]
         }));
 
-        // Get all existing schedule entries first
         const { data: existing } = await supabase.from('schedule').select('id');
-        
-        // Delete all existing schedule entries if any
         if (existing && existing.length > 0) {
             const idsToDelete = existing.map(s => s.id);
             const { error: deleteError } = await supabase
@@ -908,18 +938,16 @@ async function saveSchedule() {
             if (deleteError) throw deleteError;
         }
 
-        // Insert all current schedule entries
         if (scheduleEntries.length > 0) {
             const { error } = await supabase
                 .from('schedule')
                 .insert(scheduleEntries);
-            
             if (error) throw error;
         }
     } catch (error) {
         console.error('Error saving schedule:', error);
-        // Fallback to localStorage
         localStorage.setItem('schedule', JSON.stringify(schedule));
+        localStorage.setItem('leadershipSchedule', JSON.stringify(leadershipSchedule));
     }
 }
 
@@ -1022,9 +1050,10 @@ async function saveWeeklyTimeTracking() {
 // Save app settings to Supabase
 async function saveAppSettings() {
     try {
-        // Save timeBlocks, isDarkTheme, clientDetails to Supabase (currentWeekStart stays local)
+        // Save timeBlocks (production only; leadership never stored in app_settings)
+        const productionTimeBlocks = (timeBlocks || []).filter(b => b && !b.id.startsWith('leadership-'));
         const settings = [
-            { key: 'timeBlocks', value: timeBlocks },
+            { key: 'timeBlocks', value: productionTimeBlocks },
             { key: 'isDarkTheme', value: isDarkTheme },
             { key: 'clientDetails', value: clientDetails }
         ];
@@ -1038,8 +1067,8 @@ async function saveAppSettings() {
         }
     } catch (error) {
         console.error('Error saving app settings:', error);
-        // Fallback to localStorage
-        localStorage.setItem('timeBlocks', JSON.stringify(timeBlocks));
+        const productionTimeBlocks = (timeBlocks || []).filter(b => b && !b.id.startsWith('leadership-'));
+        localStorage.setItem('timeBlocks', JSON.stringify(productionTimeBlocks));
         localStorage.setItem('isDarkTheme', isDarkTheme);
         localStorage.setItem('clientDetails', JSON.stringify(clientDetails));
     }
@@ -2959,13 +2988,17 @@ function editClient(index) {
         const oldName = clients[index].name;
         clients[index].name = newName.trim();
         
-        // Update all schedule entries with this client
         Object.keys(schedule).forEach(key => {
             if (Array.isArray(schedule[key])) {
                 schedule[key].forEach(assignment => {
-                    if (assignment.client === oldName) {
-                        assignment.client = newName.trim();
-                    }
+                    if (assignment.client === oldName) assignment.client = newName.trim();
+                });
+            }
+        });
+        Object.keys(leadershipSchedule).forEach(key => {
+            if (Array.isArray(leadershipSchedule[key])) {
+                leadershipSchedule[key].forEach(assignment => {
+                    if (assignment.client === oldName) assignment.client = newName.trim();
                 });
             }
         });
@@ -2987,16 +3020,18 @@ function deleteClient(index) {
     const clientName = clients[index].name;
     clients.splice(index, 1);
     
-    // Remove all schedule entries with this client
     Object.keys(schedule).forEach(key => {
         if (Array.isArray(schedule[key])) {
             schedule[key] = schedule[key].filter(assignment => assignment.client !== clientName);
-            if (schedule[key].length === 0) {
-                delete schedule[key];
-            }
+            if (schedule[key].length === 0) delete schedule[key];
         }
     });
-    
+    Object.keys(leadershipSchedule).forEach(key => {
+        if (Array.isArray(leadershipSchedule[key])) {
+            leadershipSchedule[key] = leadershipSchedule[key].filter(assignment => assignment.client !== clientName);
+            if (leadershipSchedule[key].length === 0) delete leadershipSchedule[key];
+        }
+    });
     saveData();
     renderSidebar();
     renderSettings();
@@ -3137,20 +3172,18 @@ window.deleteLeadershipMember = function(index) {
     const memberName = leadershipMembers[index].name;
     leadershipMembers.splice(index, 1);
     
-    // Remove all schedule entries with this member
-    Object.keys(schedule).forEach(key => {
-        if (Array.isArray(schedule[key])) {
-            schedule[key] = schedule[key].filter(assignment => assignment.member !== memberName);
-            if (schedule[key].length === 0) {
-                delete schedule[key];
-            }
+    Object.keys(leadershipSchedule).forEach(key => {
+        if (Array.isArray(leadershipSchedule[key])) {
+            leadershipSchedule[key] = leadershipSchedule[key].filter(assignment => assignment.member !== memberName);
+            if (leadershipSchedule[key].length === 0) delete leadershipSchedule[key];
         }
     });
-    
     saveData();
     renderSettings();
     if (isLeadershipMode) {
-        renderSidebar(); if (isLeadershipMode) updateStats();
+        renderSidebar();
+        updateStats();
+        renderAllLeadershipTimeEntries();
     }
     updateStats();
 };
@@ -3468,23 +3501,21 @@ function updateStats() {
         });
     });
 
-    // Leadership hours (from schedule keys *-leadership-{start}-{end}) for current week
+    // Leadership hours from leadershipSchedule only
     const leadershipPersonHours = {};
     const leadershipClientHours = {};
     leadershipMembers.forEach(m => { leadershipPersonHours[m.name] = 0; });
     clients.forEach(c => { leadershipClientHours[c.name] = 0; });
-    Object.keys(schedule).forEach((key) => {
-        if (key.indexOf('-leadership-') === -1) return;
+    Object.keys(leadershipSchedule).forEach((key) => {
         const parts = key.split('-leadership-');
         if (parts.length < 2) return;
-        const dayDateKey = parts[0];
         const suffix = parts[1];
         const numParts = suffix.split('-').map(Number);
         if (numParts.length < 2) return;
         const startMinutes = numParts[0];
         const endMinutes = numParts[1];
         const blockHours = (endMinutes - startMinutes) / 60;
-        const assignments = schedule[key] || [];
+        const assignments = leadershipSchedule[key] || [];
         assignments.forEach(assignment => {
             if (!assignment || !assignment.member || !assignment.client) return;
             if (leadershipPersonHours.hasOwnProperty(assignment.member)) {
@@ -4013,42 +4044,15 @@ function renderAllLeadershipTimeEntries() {
     dayDate.setDate(currentWeekStart.getDate() + dayIdx);
     const dayDateKey = formatDateKey(dayDate, dayName);
 
-    // 1) From timeBlocks (block-based; includes leadership-* blocks we added)
-    timeBlocks.forEach((block) => {
-        const blockKey = `${dayDateKey}-${block.id}`;
-        const assignments = schedule[blockKey] || [];
-        assignments.forEach((assignment, assignmentIdx) => {
-            const memberIndex = membersToSearch.findIndex(m => m.name === assignment.member);
-            if (memberIndex === -1) return;
-            const memberColumn = document.querySelector(`.leadership-member-column[data-member-index="${memberIndex}"]`);
-            if (!memberColumn) return;
-            let startMinutes, endMinutes;
-            if (block.id.startsWith('leadership-')) {
-                const parts = block.id.replace('leadership-', '').split('-').map(Number);
-                if (parts.length >= 2) {
-                    startMinutes = parts[0];
-                    endMinutes = parts[1];
-                } else return;
-            } else {
-                const startParts = (block.startTime || '09:00').split(':');
-                const endParts = (block.endTime || '10:00').split(':');
-                startMinutes = parseInt(startParts[0], 10) * 60 + parseInt(startParts[1] || 0, 10);
-                endMinutes = parseInt(endParts[0], 10) * 60 + parseInt(endParts[1] || 0, 10);
-            }
-            renderOneLeadershipEntry(memberColumn, blockKey, assignment, assignmentIdx, startMinutes, endMinutes);
-            renderedKeys.add(blockKey);
-        });
-    });
-
-    // 2) From schedule keys that are hourly (leadership-{start}-{end}) in case they're not in timeBlocks
-    Object.keys(schedule).forEach((key) => {
-        if (!key.startsWith(dayDateKey + '-leadership-') || renderedKeys.has(key)) return;
-        const assignments = schedule[key] || [];
+    // From leadershipSchedule keys for this day only (key format: dayDateKey-leadership-start-end)
+    Object.keys(leadershipSchedule).forEach((key) => {
+        if (!key.startsWith(dayDateKey + '-leadership-')) return;
         const suffix = key.slice((dayDateKey + '-leadership-').length);
         const parts = suffix.split('-').map(Number);
         if (parts.length < 2) return;
         const startMinutes = parts[0];
         const endMinutes = parts[1];
+        const assignments = leadershipSchedule[key] || [];
         assignments.forEach((assignment, assignmentIdx) => {
             const memberIndex = membersToSearch.findIndex(m => m.name === assignment.member);
             if (memberIndex === -1) return;
@@ -4098,7 +4102,7 @@ function showLeadershipEditModal(entry) {
     
     const blockKey = entry.dataset.blockKey;
     const assignmentIndex = parseInt(entry.dataset.assignmentIndex);
-    const assignments = schedule[blockKey] || [];
+    const assignments = leadershipSchedule[blockKey] || [];
     const assignment = assignments[assignmentIndex];
     
     if (!assignment) return;
@@ -4127,7 +4131,11 @@ function showLeadershipEditModal(entry) {
                 closeLeadershipClientModal();
                 assignment.client = client.name;
                 saveData();
-                renderSidebar(); if (isLeadershipMode) updateStats();
+                renderSidebar();
+                if (isLeadershipMode) {
+                    updateStats();
+                    renderAllLeadershipTimeEntries();
+                }
                 renderCalendar();
                 updateStats();
             };
@@ -4136,6 +4144,32 @@ function showLeadershipEditModal(entry) {
     }
     
     modal.classList.add('show');
+}
+
+// Save leadership entry after resize (move to new time slot key if start/end changed)
+function saveLeadershipTimeEntry(oldBlockKey, assignmentIndex, startMinutes, endMinutes) {
+    const assignments = leadershipSchedule[oldBlockKey];
+    if (!assignments || !assignments[assignmentIndex]) return;
+    const assignment = assignments[assignmentIndex];
+    const dayDateKey = oldBlockKey.split('-leadership-')[0];
+    if (!dayDateKey) return;
+    const newBlockId = `leadership-${startMinutes}-${endMinutes}`;
+    const newBlockKey = `${dayDateKey}-${newBlockId}`;
+    if (newBlockKey === oldBlockKey) {
+        saveData();
+        if (isLeadershipMode) renderAllLeadershipTimeEntries();
+        return;
+    }
+    saveStateToHistory();
+    assignments.splice(assignmentIndex, 1);
+    if (assignments.length === 0) delete leadershipSchedule[oldBlockKey];
+    if (!leadershipSchedule[newBlockKey]) leadershipSchedule[newBlockKey] = [];
+    leadershipSchedule[newBlockKey].push({ member: assignment.member, client: assignment.client });
+    saveData();
+    if (isLeadershipMode) {
+        updateStats();
+        renderAllLeadershipTimeEntries();
+    }
 }
 
 // Close leadership client modal
@@ -4173,45 +4207,50 @@ function createLeadershipTimeEntry(memberIndex, startMinutes, endMinutes, client
     const dayDateKey = formatDateKey(dayDate, dayName);
     const blockKey = `${dayDateKey}-${blockId}`;
     
-    // Check if block exists, if not create it
-    let matchingBlock = timeBlocks.find(b => b.id === blockId);
-    if (!matchingBlock) {
-        matchingBlock = {
-            id: blockId,
-            label: `${startTime} - ${endTime}`,
-            time: `${startTime} - ${endTime}`,
-            startTime: startTime,
-            endTime: endTime,
-            isLunch: false
-        };
-        timeBlocks.push(matchingBlock);
+    if (!leadershipSchedule[blockKey]) {
+        leadershipSchedule[blockKey] = [];
     }
-    
-    if (!schedule[blockKey]) {
-        schedule[blockKey] = [];
-    }
-    
-    // Check if this exact entry already exists
-    const exists = schedule[blockKey].some(a => 
+    const exists = leadershipSchedule[blockKey].some(a =>
         a.member === member.name && a.client === clientName
     );
-    
     if (!exists) {
         saveStateToHistory();
-        schedule[blockKey].push({
+        leadershipSchedule[blockKey].push({
             member: member.name,
             client: clientName
         });
         saveData();
-        renderSidebar(); if (isLeadershipMode) updateStats();
+        renderSidebar();
+        if (isLeadershipMode) {
+            updateStats();
+            renderAllLeadershipTimeEntries();
+        }
         renderCalendar();
         updateStats();
     }
 }
 
+// Delete leadership time entry (global function for onclick)
+window.deleteLeadershipTimeEntry = function(event, blockKey, assignmentIndex) {
+    if (!isAdminMode && !isLeadershipMode) return;
+    event.stopPropagation();
+    saveStateToHistory();
+    if (leadershipSchedule[blockKey] && Array.isArray(leadershipSchedule[blockKey])) {
+        leadershipSchedule[blockKey].splice(assignmentIndex, 1);
+        if (leadershipSchedule[blockKey].length === 0) {
+            delete leadershipSchedule[blockKey];
+        }
+    }
+    saveData();
+    renderSidebar();
+    if (isLeadershipMode) updateStats();
+    renderCalendar();
+    updateStats();
+};
+
 // Move a leadership entry to another column/time (drag-and-drop). Blocks are always 1 hour.
 function moveLeadershipEntry(fromBlockKey, assignmentIndex, toMemberIndex, startMinutes, endMinutes) {
-    const assignments = schedule[fromBlockKey];
+    const assignments = leadershipSchedule[fromBlockKey];
     if (!assignments || !assignments[assignmentIndex]) return;
     const assignment = assignments[assignmentIndex];
     const membersToUse = isLeadershipMode ? leadershipMembers : teamMembers;
@@ -4223,51 +4262,19 @@ function moveLeadershipEntry(fromBlockKey, assignmentIndex, toMemberIndex, start
     const newBlockKey = `${dayDateKey}-${newBlockId}`;
     saveStateToHistory();
     assignments.splice(assignmentIndex, 1);
-    if (assignments.length === 0) delete schedule[fromBlockKey];
-    if (!schedule[newBlockKey]) schedule[newBlockKey] = [];
-    schedule[newBlockKey].push({
+    if (assignments.length === 0) delete leadershipSchedule[fromBlockKey];
+    if (!leadershipSchedule[newBlockKey]) leadershipSchedule[newBlockKey] = [];
+    leadershipSchedule[newBlockKey].push({
         member: toMember.name,
         client: assignment.client
     });
-    const blockId = newBlockId;
-    if (!timeBlocks.find(b => b.id === blockId)) {
-        const st = Math.floor(startMinutes / 60);
-        const sm = startMinutes % 60;
-        const et = Math.floor(endMinutes / 60);
-        const em = endMinutes % 60;
-        timeBlocks.push({
-            id: blockId,
-            label: `${String(st).padStart(2,'0')}:${String(sm).padStart(2,'0')} - ${String(et).padStart(2,'0')}:${String(em).padStart(2,'0')}`,
-            time: '',
-            startTime: `${String(st).padStart(2,'0')}:${String(sm).padStart(2,'0')}`,
-            endTime: `${String(et).padStart(2,'0')}:${String(em).padStart(2,'0')}`,
-            isLunch: false
-        });
-    }
     saveData();
     renderSidebar();
-    if (isLeadershipMode) updateStats();
+    if (isLeadershipMode) {
+        updateStats();
+        renderAllLeadershipTimeEntries();
+    }
     renderCalendar();
     updateStats();
 }
-
-// Delete leadership time entry (global function for onclick)
-window.deleteLeadershipTimeEntry = function(event, blockKey, assignmentIndex) {
-    if (!isAdminMode && !isLeadershipMode) return;
-    event.stopPropagation();
-    
-    saveStateToHistory();
-    
-    if (schedule[blockKey] && Array.isArray(schedule[blockKey])) {
-        schedule[blockKey].splice(assignmentIndex, 1);
-        if (schedule[blockKey].length === 0) {
-            delete schedule[blockKey];
-        }
-    }
-    
-    saveData();
-    renderSidebar(); if (isLeadershipMode) updateStats();
-    renderCalendar();
-    updateStats();
-};
 

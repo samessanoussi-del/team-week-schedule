@@ -121,9 +121,16 @@
             <!-- Leadership Mode View -->
             <main class="leadership-container" id="leadershipView" style="display: none;">
                 <div class="leadership-header">
-                    <div class="leadership-time-header"></div>
-                    <div class="leadership-members-header" id="leadershipMembersHeader">
-                        <!-- Team member headers will be populated here -->
+                    <div class="leadership-header-row">
+                        <div class="leadership-time-header"></div>
+                        <div class="leadership-members-header" id="leadershipMembersHeader">
+                            <!-- Team member headers will be populated here -->
+                        </div>
+                    </div>
+                    <div class="leadership-day-nav" id="leadershipDayNav">
+                        <button type="button" class="leadership-day-nav-arrow" id="leadershipDayPrev" title="Previous day" aria-label="Previous day">←</button>
+                        <span class="leadership-day-nav-label" id="leadershipDayLabel">Monday</span>
+                        <button type="button" class="leadership-day-nav-arrow" id="leadershipDayNext" title="Next day" aria-label="Next day">→</button>
                     </div>
                 </div>
                 <div class="leadership-body">

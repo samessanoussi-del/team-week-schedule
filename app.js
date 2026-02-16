@@ -3724,23 +3724,30 @@ function renderLeadershipMode() {
     const membersHeader = document.getElementById('leadershipMembersHeader');
     const timeColumn = document.getElementById('leadershipTimeColumn');
     const grid = document.getElementById('leadershipGrid');
+    const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
     
-    // Clear existing content
-    if (timeHeader) {
-        timeHeader.innerHTML = '';
-        const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
-        days.forEach((label, i) => {
-            const btn = document.createElement('button');
-            btn.className = 'leadership-day-btn' + (i === currentLeadershipDayIndex ? ' active' : '');
-            btn.textContent = label;
-            btn.onclick = () => {
-                currentLeadershipDayIndex = i;
-                document.querySelectorAll('.leadership-day-btn').forEach((b, j) => b.classList.toggle('active', j === i));
-                renderAllLeadershipTimeEntries();
-            };
-            timeHeader.appendChild(btn);
-        });
+    // Day nav: update label and wire prev/next (row under members, left-aligned, Toggl-style)
+    const dayLabelEl = document.getElementById('leadershipDayLabel');
+    const dayPrevBtn = document.getElementById('leadershipDayPrev');
+    const dayNextBtn = document.getElementById('leadershipDayNext');
+    if (dayLabelEl) dayLabelEl.textContent = dayNames[currentLeadershipDayIndex];
+    if (dayPrevBtn) {
+        dayPrevBtn.onclick = () => {
+            currentLeadershipDayIndex = (currentLeadershipDayIndex - 1 + 5) % 5;
+            if (dayLabelEl) dayLabelEl.textContent = dayNames[currentLeadershipDayIndex];
+            renderAllLeadershipTimeEntries();
+        };
     }
+    if (dayNextBtn) {
+        dayNextBtn.onclick = () => {
+            currentLeadershipDayIndex = (currentLeadershipDayIndex + 1) % 5;
+            if (dayLabelEl) dayLabelEl.textContent = dayNames[currentLeadershipDayIndex];
+            renderAllLeadershipTimeEntries();
+        };
+    }
+    
+    // Time header stays empty (spacer for grid alignment)
+    if (timeHeader) timeHeader.innerHTML = '';
     membersHeader.innerHTML = '';
     timeColumn.innerHTML = '';
     grid.innerHTML = '';

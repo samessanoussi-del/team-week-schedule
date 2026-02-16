@@ -2181,6 +2181,7 @@ body.bright-theme .leadership-container {
 
 .leadership-header {
     display: flex;
+    flex-direction: column;
     position: sticky;
     top: 0;
     z-index: 10;
@@ -2194,17 +2195,81 @@ body.bright-theme .leadership-header {
     border-bottom-color: var(--bright-border);
 }
 
+.leadership-header-row {
+    display: flex;
+    min-width: 0;
+}
+
 .leadership-time-header {
     width: 100px;
     min-width: 100px;
     flex-shrink: 0;
     border-right: 2px solid var(--dark-border);
     padding: 1rem;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.25rem;
-    align-content: flex-start;
 }
+
+body.bright-theme .leadership-time-header {
+    border-right-color: var(--bright-border);
+}
+
+/* Day nav row under members: left-aligned, Toggl-style ← Day → */
+.leadership-day-nav {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-top: 1px solid var(--dark-border);
+    background: rgba(0, 0, 0, 0.15);
+    min-width: 0;
+}
+
+body.bright-theme .leadership-day-nav {
+    border-top-color: var(--bright-border);
+    background: rgba(0, 0, 0, 0.04);
+}
+
+.leadership-day-nav-arrow {
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--dark-border);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--dark-primary);
+    cursor: pointer;
+    font-size: 1.1rem;
+    padding: 0;
+    transition: background 0.2s, border-color 0.2s;
+}
+
+.leadership-day-nav-arrow:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: var(--dark-primary);
+}
+
+body.bright-theme .leadership-day-nav-arrow {
+    border-color: var(--bright-border);
+    color: var(--bright-primary);
+}
+
+body.bright-theme .leadership-day-nav-arrow:hover {
+    background: rgba(0, 0, 0, 0.06);
+    border-color: var(--bright-primary);
+}
+
+.leadership-day-nav-label {
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: var(--dark-primary);
+    min-width: 100px;
+}
+
+body.bright-theme .leadership-day-nav-label {
+    color: var(--bright-primary);
+}
+
 .leadership-day-btn {
     padding: 0.25rem 0.5rem;
     border: 1px solid var(--dark-border);
@@ -2233,11 +2298,6 @@ body.bright-theme .leadership-day-btn.active {
     background: var(--bright-primary);
     color: #fff;
     border-color: var(--bright-primary);
-}
-
-body.bright-theme .leadership-time-header {
-    border-right-color: var(--bright-border);
-    color: var(--bright-primary);
 }
 
 .leadership-members-header {

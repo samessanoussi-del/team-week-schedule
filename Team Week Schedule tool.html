@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Team Week Schedule</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
-    <link rel="stylesheet" href="styles.css?v=15">
+    <link rel="stylesheet" href="styles.css?v=16">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
 <body>
@@ -217,7 +217,9 @@
             </div>
             <div class="modal-body">
                 <div class="client-detail-form">
-                    <label>Project deadline</label>
+                    <label>Client name</label>
+                    <input type="text" id="clientDetailName" class="input-field" placeholder="Client name">
+                    <label style="margin-top: 1rem;">Project deadline</label>
                     <input type="date" id="clientDetailDeadline" class="input-field">
                     <label style="margin-top: 1rem;">Project stops (e.g. Design, Animation)</label>
                     <div id="clientDetailStopsList"></div>

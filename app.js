@@ -2025,12 +2025,6 @@ function renderSettings() {
             </div>
             <span class="settings-item-name">${member.name}</span>
             <div class="settings-item-actions" style="${disabledStyle}">
-                <label class="leadership-toggle-label" title="Include in Leadership Members calendar">
-                    <input type="checkbox" class="leadership-toggle-checkbox" 
-                           ${leadershipMembers.find(m => m.name === member.name) ? 'checked' : ''}
-                           onchange="toggleProductionMemberToLeadership(${index}, this.checked)" ${disabledAttr}>
-                    <span class="leadership-toggle-text">Leadership</span>
-                </label>
                 <button class="btn-edit" onclick="editMember(${index})" ${disabledAttr}>Edit</button>
                 <button class="btn-delete" onclick="deleteMember(${index})" ${disabledAttr}>Delete</button>
             </div>
@@ -2088,8 +2082,7 @@ function renderSettings() {
             </div>
             <span class="settings-item-name">${client.name}</span>
             <div class="settings-item-actions" style="${disabledStyle}">
-                <button class="btn-edit" onclick="openClientDetail(${index})" ${disabledAttr} title="Deadline & project stops">Details</button>
-                <button class="btn-edit" onclick="editClient(${index})" ${disabledAttr}>Edit</button>
+                <button class="btn-edit btn-edit-icon" onclick="openClientDetail(${index})" ${disabledAttr} title="Edit name, deadline & project stops">&#9998;</button>
                 <button class="btn-delete" onclick="deleteClient(${index})" ${disabledAttr}>Delete</button>
             </div>
         `;
@@ -3136,7 +3129,9 @@ function openClientDetail(clientIndex) {
     if (!client) return;
     const details = clientDetails[client.name] || { deadline: '', stops: [] };
     if (!details.stops || !Array.isArray(details.stops)) details.stops = [];
-    document.getElementById('clientDetailTitle').textContent = client.name + ' – Details';
+    document.getElementById('clientDetailTitle').textContent = 'Edit client';
+    const nameEl = document.getElementById('clientDetailName');
+    if (nameEl) nameEl.value = client.name;
     document.getElementById('clientDetailDeadline').value = details.deadline || '';
     renderClientDetailStops(details.stops);
     document.getElementById('clientDetailModal').classList.add('show');
@@ -3163,18 +3158,32 @@ function saveClientDetailAndClose() {
     if (clientDetailEditingIndex < 0) return;
     const client = clients[clientDetailEditingIndex];
     if (!client) return;
+    const nameEl = document.getElementById('clientDetailName');
+    const newName = nameEl && nameEl.value.trim() ? nameEl.value.trim() : client.name;
     const deadline = document.getElementById('clientDetailDeadline').value || '';
     const stopRows = document.querySelectorAll('.client-stop-row');
     const stops = [];
     stopRows.forEach(row => {
-        const nameEl = row.querySelector('.client-stop-name');
+        const nEl = row.querySelector('.client-stop-name');
         const dueEl = row.querySelector('.client-stop-due');
-        if (nameEl && nameEl.value.trim()) {
-            stops.push({ name: nameEl.value.trim(), due: dueEl ? dueEl.value : '' });
+        if (nEl && nEl.value.trim()) {
+            stops.push({ name: nEl.value.trim(), due: dueEl ? dueEl.value : '' });
         }
     });
-    clientDetails[client.name] = { deadline, stops };
+    const oldName = client.name;
+    if (newName !== oldName && !clients.find(c => c.name === newName && c !== client)) {
+        saveStateToHistory();
+        client.name = newName;
+        if (clientDetails[oldName]) {
+            clientDetails[newName] = clientDetails[oldName];
+            delete clientDetails[oldName];
+        }
+        saveData();
+        renderSidebar();
+    }
+    clientDetails[newName] = { deadline, stops };
     saveAppSettings();
+    if (newName !== oldName) renderSettings();
     document.getElementById('clientDetailModal').classList.remove('show');
     clientDetailEditingIndex = -1;
 }

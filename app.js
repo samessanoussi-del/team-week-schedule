@@ -4081,8 +4081,8 @@ function showLeadershipClientModal(memberIndex, startMinutes, endMinutes) {
                 <span>${client.name}</span>
             `;
             option.onclick = () => {
-                closeLeadershipClientModal();
                 createLeadershipTimeEntry(memberIndex, startMinutes, endMinutes, client.name);
+                closeLeadershipClientModal();
             };
             clientList.appendChild(option);
         });
@@ -4147,7 +4147,7 @@ function closeLeadershipClientModal() {
 
 // Create time entry in leadership mode (minute-based)
 function createLeadershipTimeEntry(memberIndex, startMinutes, endMinutes, clientName) {
-    if ((!isAdminMode && !isLeadershipMode) || !window.leadershipPendingEntry) return;
+    if (!isAdminMode && !isLeadershipMode) return;
     
     const membersToUse = isLeadershipMode ? leadershipMembers : teamMembers;
     const member = membersToUse[memberIndex];

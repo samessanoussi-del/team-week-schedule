@@ -128,7 +128,7 @@ If Save still fails, open the browser console (F12) and check for Supabase error
 
 ### Who is online (avatar strip in the header)
 
-The strip to the **left of "Leadership Members"** currently shows **only your own** avatar (from your profile). It does **not** yet show other people who are online.
+The strip to the **left of "Leadership Members"** shows everyone currently online (names, profile pictures, and avatar colors).
 
 To show **other users** who are viewing the app you would need one of these, **outside Cursor** (in Supabase and/or your app):
 
@@ -140,7 +140,7 @@ To show **other users** who are viewing the app you would need one of these, **o
 - **Option B – Custom “online users” table**  
   A table like `online_users` (e.g. user id, last_seen, etc.) that the app updates on a timer and reads to show who’s online. You’d need to create the table and add the sync logic.
 
-So: **Profile Save** = set up Supabase (table + anon key) as above. **Who is online** = right now only you; to see others, Supabase (and possibly extra code) is needed as above.
+**Who is online** is now implemented: the strip shows everyone viewing the app. Run `ADD_ONLINE_USERS_COLUMNS.sql` in Supabase SQL Editor so the `online_users` table has the profile columns and `last_seen_at`.
 
 ## Step 4: Enable Realtime
 

@@ -4050,7 +4050,7 @@ function renderOneLeadershipEntry(memberColumn, blockKey, assignment, assignment
     entry.innerHTML = `
         ${resizeHandles}
         <span>${assignment.client} (${durationText})</span>
-        ${canEdit ? '<button class="leadership-time-entry-delete" onclick="deleteLeadershipTimeEntry(event, \'' + blockKey.replace(/'/g, "\\'") + '\', ' + assignmentIdx + ')">&times;</button>' : ''}
+        ${canEdit ? '<button type="button" class="leadership-time-entry-delete" title="Delete">&times;</button>' : ''}
     `;
     if (canEdit) {
         entry.draggable = true;
@@ -4073,6 +4073,10 @@ function renderOneLeadershipEntry(memberColumn, blockKey, assignment, assignment
         entry.addEventListener('click', (ev) => {
             ev.stopPropagation();
             if (window._leadershipEntryDragJustEnded) return;
+            if (ev.target.closest('.leadership-time-entry-delete')) {
+                deleteLeadershipTimeEntry(ev, entry.dataset.blockKey, parseInt(entry.dataset.assignmentIndex, 10));
+                return;
+            }
             showLeadershipEditModal(entry);
         });
     }

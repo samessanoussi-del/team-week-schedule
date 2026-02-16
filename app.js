@@ -3563,7 +3563,7 @@ function updateStats() {
         dayDate.setDate(currentWeekStart.getDate() + dayIndex);
         const dateKey = formatDateKey(dayDate, day);
         
-        timeBlocks.forEach(block) => {
+        timeBlocks.forEach((block) => {
             if (block.isLunch) return;
             if (block.id.startsWith('leadership-')) return; // Production stats exclude leadership blocks
             const blockKey = `${dateKey}-${block.id}`;

@@ -31,7 +31,11 @@ function setupAuthListeners() {
     // #region agent log
     fetch('http://127.0.0.1:7242/ingest/ec7ef1a8-7389-4213-a659-4b03335bac18',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:setupAuthListeners',message:'entry',data:{hasAuthTabs:!!authTabs,hasSignInForm:!!signInForm,hasSignUpForm:!!signUpForm},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{});
     // #endregion
-    if (!signInForm || !signUpForm) return;
+    console.log('[Auth] setupAuthListeners: forms=', !!signInForm, !!signUpForm, 'tabs=', !!authTabs);
+    if (!signInForm || !signUpForm) {
+        console.warn('[Auth] setupAuthListeners: missing form(s), listeners NOT attached');
+        return;
+    }
 
     // Tab switch: use delegation so clicks always work
     if (authTabs) {
@@ -41,6 +45,7 @@ function setupAuthListeners() {
             // #region agent log
             fetch('http://127.0.0.1:7242/ingest/ec7ef1a8-7389-4213-a659-4b03335bac18',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:authTabClick',message:'tab clicked',data:{dataTab:tab.getAttribute('data-tab')},timestamp:Date.now(),hypothesisId:'H5'})}).catch(()=>{});
             // #endregion
+            console.log('[Auth] Tab clicked:', tab.getAttribute('data-tab'));
             const isSignUp = tab.getAttribute('data-tab') === 'signup';
             document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
             tab.classList.add('active');
@@ -53,6 +58,7 @@ function setupAuthListeners() {
         // #region agent log
         fetch('http://127.0.0.1:7242/ingest/ec7ef1a8-7389-4213-a659-4b03335bac18',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:signInSubmit',message:'sign-in submit fired',data:{},timestamp:Date.now(),hypothesisId:'H3'})}).catch(()=>{});
         // #endregion
+        console.log('[Auth] Sign-in submit handler ran');
         e.preventDefault();
         const emailEl = document.getElementById('authEmailSignIn');
         const passwordEl = document.getElementById('authPasswordSignIn');
@@ -82,6 +88,7 @@ function setupAuthListeners() {
         // #region agent log
         fetch('http://127.0.0.1:7242/ingest/ec7ef1a8-7389-4213-a659-4b03335bac18',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:signUpSubmit',message:'sign-up submit fired',data:{},timestamp:Date.now(),hypothesisId:'H3'})}).catch(()=>{});
         // #endregion
+        console.log('[Auth] Sign-up submit handler ran');
         e.preventDefault();
         const firstName = (document.getElementById('authFirstName') && document.getElementById('authFirstName').value || '').trim();
         const lastName = (document.getElementById('authLastName') && document.getElementById('authLastName').value || '').trim();
@@ -313,6 +320,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
         console.log('🚀 Initializing app...');
         if (!authScreen || !appContainer) {
+            console.log('[Auth] Init: missing authScreen or appContainer, calling setupAuthListeners');
             showAuth('Sign in or create an account to continue');
             if (appContainer) appContainer.style.display = 'flex';
             setupAuthListeners();
@@ -336,6 +344,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             // #region agent log
             fetch('http://127.0.0.1:7242/ingest/ec7ef1a8-7389-4213-a659-4b03335bac18',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:init',message:'calling setupAuthListeners',data:{hasCurrentUser:!!currentUser,hasEmail:!!(currentUser&&currentUser.email)},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{});
             // #endregion
+            console.log('[Auth] Init: calling setupAuthListeners (no user)');
             setupAuthListeners();
             return;
         }

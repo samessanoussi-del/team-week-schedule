@@ -508,12 +508,16 @@ async function loadTeamMembers(skipDefaults = false) {
         const savedLeadership = localStorage.getItem('leadershipMembers');
         if (savedMembers) teamMembers = JSON.parse(savedMembers);
         else teamMembers = [
-            { name: 'John Doe', color: '#ce2828', profilePicture: '' },
-            { name: 'Jane Smith', color: '#4a90e2', profilePicture: '' },
-            { name: 'Bob Johnson', color: '#50c878', profilePicture: '' }
+            { name: 'Kendall', color: '#ce2828', profilePicture: '' },
+            { name: 'Connor', color: '#50c878', profilePicture: '' },
+            { name: 'Chaewon', color: '#4a90e2', profilePicture: '' },
+            { name: 'Game Time', color: '#e2a84a', profilePicture: '' }
         ];
         if (savedLeadership) leadershipMembers = JSON.parse(savedLeadership);
-        else leadershipMembers = [];
+        else leadershipMembers = [
+            { name: 'Sam', color: '#e2a84a', profilePicture: '' },
+            { name: 'Will', color: '#9b59b6', profilePicture: '' }
+        ];
         return;
     }
 
@@ -533,6 +537,38 @@ async function loadTeamMembers(skipDefaults = false) {
             });
             teamMembers = data.filter(m => !m.is_leadership).map(base);
             leadershipMembers = data.filter(m => m.is_leadership).map(base);
+            // One-time: if production members are wrong (old defaults or all 5 in production), restore correct split
+            const oldDefaultNames = ['John Doe', 'Jane Smith', 'Bob Johnson'];
+            const currentProdNames = teamMembers.map(m => m.name).sort().join(',');
+            const oldNames = oldDefaultNames.slice().sort().join(',');
+            const hasWrongProduction = (teamMembers.length === 3 && currentProdNames === oldNames) ||
+                (teamMembers.length === 5 && teamMembers.every(m => ['Kendall','Chaewon','Connor','Sam','Will'].includes(m.name)));
+            if (hasWrongProduction) {
+                const nameMap = { 'John Doe': 'Kendall', 'Jane Smith': 'Chaewon', 'Bob Johnson': 'Connor' };
+                teamMembers = [
+                    { name: 'Kendall', color: '#ce2828', profilePicture: '' },
+                    { name: 'Connor', color: '#50c878', profilePicture: '' },
+                    { name: 'Chaewon', color: '#4a90e2', profilePicture: '' },
+                    { name: 'Game Time', color: '#e2a84a', profilePicture: '' }
+                ];
+                leadershipMembers = [
+                    { name: 'Sam', color: '#e2a84a', profilePicture: '' },
+                    { name: 'Will', color: '#9b59b6', profilePicture: '' }
+                ];
+                Object.keys(schedule).forEach(key => {
+                    if (Array.isArray(schedule[key])) {
+                        schedule[key].forEach(a => {
+                            if (a && a.member && nameMap[a.member]) a.member = nameMap[a.member];
+                        });
+                    }
+                });
+                console.log('📥 Restored production: Kendall, Connor, Chaewon, Game Time; leadership: Sam, Will');
+                if (!isSaving) {
+                    isSaving = true;
+                    saveTeamMembers().catch(err => console.error('Failed to save team members:', err)).finally(() => { isSaving = false; });
+                    saveSchedule().catch(err => console.error('Failed to save schedule:', err));
+                }
+            }
         } else {
             // Supabase has no team members: try localStorage backup before defaults
             const savedMembers = localStorage.getItem('teamMembers');
@@ -558,9 +594,14 @@ async function loadTeamMembers(skipDefaults = false) {
             if (teamMembers.length === 0 && !skipDefaults) {
                 console.log('No team members found, creating defaults...');
                 teamMembers = [
-                    { name: 'John Doe', color: '#ce2828', profilePicture: '' },
-                    { name: 'Jane Smith', color: '#4a90e2', profilePicture: '' },
-                    { name: 'Bob Johnson', color: '#50c878', profilePicture: '' }
+                    { name: 'Kendall', color: '#ce2828', profilePicture: '' },
+                    { name: 'Connor', color: '#50c878', profilePicture: '' },
+                    { name: 'Chaewon', color: '#4a90e2', profilePicture: '' },
+                    { name: 'Game Time', color: '#e2a84a', profilePicture: '' }
+                ];
+                leadershipMembers = leadershipMembers.length ? leadershipMembers : [
+                    { name: 'Sam', color: '#e2a84a', profilePicture: '' },
+                    { name: 'Will', color: '#9b59b6', profilePicture: '' }
                 ];
                 if (!isSaving) {
                     isSaving = true;
@@ -579,12 +620,16 @@ async function loadTeamMembers(skipDefaults = false) {
         const savedLeadership = localStorage.getItem('leadershipMembers');
         if (savedMembers) teamMembers = JSON.parse(savedMembers);
         else teamMembers = [
-            { name: 'John Doe', color: '#ce2828', profilePicture: '' },
-            { name: 'Jane Smith', color: '#4a90e2', profilePicture: '' },
-            { name: 'Bob Johnson', color: '#50c878', profilePicture: '' }
+            { name: 'Kendall', color: '#ce2828', profilePicture: '' },
+            { name: 'Connor', color: '#50c878', profilePicture: '' },
+            { name: 'Chaewon', color: '#4a90e2', profilePicture: '' },
+            { name: 'Game Time', color: '#e2a84a', profilePicture: '' }
         ];
         if (savedLeadership) leadershipMembers = JSON.parse(savedLeadership);
-        else leadershipMembers = [];
+        else leadershipMembers = [
+            { name: 'Sam', color: '#e2a84a', profilePicture: '' },
+            { name: 'Will', color: '#9b59b6', profilePicture: '' }
+        ];
     }
 }
 

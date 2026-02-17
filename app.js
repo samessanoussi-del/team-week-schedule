@@ -1519,8 +1519,11 @@ function renderCalendar() {
                 const clearBtnContainer = document.createElement('div');
                 clearBtnContainer.className = 'block-clear-buttons';
                 
-                // Clear this block button
-                if (assignments.length > 0) {
+                // Clear this block button (use assignmentsWithIndex - same list we rendered)
+                // #region agent log
+                fetch('http://127.0.0.1:7242/ingest/ec7ef1a8-7389-4213-a659-4b03335bac18',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:clearBlockCheck',message:'assignmentsWithIndex in scope',data:{blockKey,count:assignmentsWithIndex.length,hasAssignments:assignmentsWithIndex.length>0},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{});
+                // #endregion
+                if (assignmentsWithIndex.length > 0) {
                     const clearBtn = document.createElement('button');
                     clearBtn.className = 'block-clear-btn';
                     clearBtn.innerHTML = 'Clear Block';

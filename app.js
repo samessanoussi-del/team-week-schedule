@@ -551,10 +551,14 @@ async function loadTeamMembers(skipDefaults = false) {
                     { name: 'Chaewon', color: '#4a90e2', profilePicture: '' },
                     { name: 'Game Time', color: '#e2a84a', profilePicture: '' }
                 ];
-                leadershipMembers = [
+                const defaultLeadership = [
                     { name: 'Sam', color: '#e2a84a', profilePicture: '' },
                     { name: 'Will', color: '#9b59b6', profilePicture: '' }
                 ];
+                leadershipMembers = defaultLeadership.map(def => {
+                    const existing = leadershipMembers.find(m => m.name === def.name);
+                    return existing ? { ...def, profilePicture: existing.profilePicture || def.profilePicture, color: existing.color || def.color } : def;
+                });
                 Object.keys(schedule).forEach(key => {
                     if (Array.isArray(schedule[key])) {
                         schedule[key].forEach(a => {
@@ -626,10 +630,16 @@ async function loadTeamMembers(skipDefaults = false) {
             { name: 'Game Time', color: '#e2a84a', profilePicture: '' }
         ];
         if (savedLeadership) leadershipMembers = JSON.parse(savedLeadership);
-        else leadershipMembers = [
-            { name: 'Sam', color: '#e2a84a', profilePicture: '' },
-            { name: 'Will', color: '#9b59b6', profilePicture: '' }
-        ];
+        else {
+            const defaultLeadership = [
+                { name: 'Sam', color: '#e2a84a', profilePicture: '' },
+                { name: 'Will', color: '#9b59b6', profilePicture: '' }
+            ];
+            leadershipMembers = defaultLeadership.map(def => {
+                const existing = leadershipMembers.find(m => m.name === def.name);
+                return existing ? { ...def, profilePicture: existing.profilePicture || def.profilePicture, color: existing.color || def.color } : def;
+            });
+        }
     }
 }
 
@@ -4107,11 +4117,11 @@ function renderLeadershipMode() {
             memberColumn.appendChild(hourCell);
         });
 
-        // Make column accept drop from sidebar (drag member onto this column)
+        // Make column accept drop from sidebar (drag member onto this column) and from leadership entries (move/duplicate)
         memberColumn.addEventListener('dragover', (e) => {
             if (!canEditLeadership) return;
             e.preventDefault();
-            e.dataTransfer.dropEffect = 'copy';
+            e.dataTransfer.dropEffect = e.shiftKey ? 'copy' : 'move';
             memberColumn.classList.add('drag-over');
         });
         memberColumn.addEventListener('dragleave', () => {
@@ -4132,7 +4142,11 @@ function renderLeadershipMode() {
                 if (parsed && parsed.type === 'leadership-entry') {
                     const duration = Math.max(15, Math.min(720, parseInt(parsed.durationMinutes, 10) || 60));
                     endMinutes = Math.min(1200, startMinutes + duration);
-                    moveLeadershipEntry(parsed.blockKey, parsed.assignmentIndex, memberIndex, startMinutes, endMinutes);
+                    if (e.shiftKey) {
+                        duplicateLeadershipEntry(parsed.blockKey, parsed.assignmentIndex, memberIndex, startMinutes, endMinutes);
+                    } else {
+                        moveLeadershipEntry(parsed.blockKey, parsed.assignmentIndex, memberIndex, startMinutes, endMinutes);
+                    }
                     return;
                 }
             } catch (_) {}
@@ -4221,6 +4235,7 @@ function renderOneLeadershipEntry(memberColumn, blockKey, assignment, assignment
     `;
     if (canEdit) {
         entry.draggable = true;
+        entry.setAttribute('title', 'Drag to move, Shift+drag to duplicate');
         entry.addEventListener('dragstart', (ev) => {
             const duration = endMinutes - startMinutes;
             ev.dataTransfer.setData('text/plain', JSON.stringify({
@@ -4229,7 +4244,7 @@ function renderOneLeadershipEntry(memberColumn, blockKey, assignment, assignment
                 assignmentIndex: assignmentIdx,
                 durationMinutes: duration
             }));
-            ev.dataTransfer.effectAllowed = 'move';
+            ev.dataTransfer.effectAllowed = 'copyMove';
             entry.classList.add('leadership-dragging');
         });
         entry.addEventListener('dragend', () => {
@@ -4477,6 +4492,34 @@ function moveLeadershipEntry(fromBlockKey, assignmentIndex, toMemberIndex, start
     saveStateToHistory();
     assignments.splice(assignmentIndex, 1);
     if (assignments.length === 0) delete leadershipSchedule[fromBlockKey];
+    if (!leadershipSchedule[newBlockKey]) leadershipSchedule[newBlockKey] = [];
+    leadershipSchedule[newBlockKey].push({
+        member: toMember.name,
+        client: assignment.client
+    });
+    saveData();
+    renderSidebar();
+    if (isLeadershipMode) {
+        updateStats();
+        renderAllLeadershipTimeEntries();
+    }
+    renderCalendar();
+    updateStats();
+}
+
+// Duplicate a leadership entry to another column/time (shift-drag). Keeps original in place.
+function duplicateLeadershipEntry(fromBlockKey, assignmentIndex, toMemberIndex, startMinutes, endMinutes) {
+    const assignments = leadershipSchedule[fromBlockKey];
+    if (!assignments || !assignments[assignmentIndex]) return;
+    const assignment = assignments[assignmentIndex];
+    const membersToUse = isLeadershipMode ? leadershipMembers : teamMembers;
+    const toMember = membersToUse[toMemberIndex];
+    if (!toMember) return;
+    const dayDateKey = fromBlockKey.split('-leadership-')[0];
+    if (!dayDateKey) return;
+    const newBlockId = `leadership-${startMinutes}-${endMinutes}`;
+    const newBlockKey = `${dayDateKey}-${newBlockId}`;
+    saveStateToHistory();
     if (!leadershipSchedule[newBlockKey]) leadershipSchedule[newBlockKey] = [];
     leadershipSchedule[newBlockKey].push({
         member: toMember.name,

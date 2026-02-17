@@ -2489,7 +2489,11 @@ body.bright-theme .leadership-hour-cell:hover {
 }
 
 .leadership-time-entry.editable {
-    cursor: pointer;
+    cursor: grab;
+}
+
+.leadership-time-entry.editable:active {
+    cursor: grabbing;
 }
 
 .leadership-time-entry.editable:hover {
@@ -2524,6 +2528,7 @@ body.bright-theme .leadership-hour-cell:hover {
 .leadership-dragging {
     opacity: 0.5;
     pointer-events: none;
+    cursor: grabbing;
 }
 
 /* Settings page (index) and Dashboard page (tool) - use full width, scrollable */

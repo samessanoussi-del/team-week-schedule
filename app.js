@@ -534,9 +534,28 @@ async function loadTeamMembers(skipDefaults = false) {
             teamMembers = data.filter(m => !m.is_leadership).map(base);
             leadershipMembers = data.filter(m => m.is_leadership).map(base);
         } else {
-            teamMembers = [];
-            leadershipMembers = [];
-            if (!skipDefaults) {
+            // Supabase has no team members: try localStorage backup before defaults
+            const savedMembers = localStorage.getItem('teamMembers');
+            const savedLeadership = localStorage.getItem('leadershipMembers');
+            if (savedMembers) {
+                try {
+                    const parsed = JSON.parse(savedMembers);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        teamMembers = parsed;
+                        console.log('📥 Restored', teamMembers.length, 'production members from localStorage backup');
+                    }
+                } catch (_) {}
+            }
+            if (savedLeadership) {
+                try {
+                    const parsed = JSON.parse(savedLeadership);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        leadershipMembers = parsed;
+                        console.log('📥 Restored', leadershipMembers.length, 'leadership members from localStorage backup');
+                    }
+                } catch (_) {}
+            }
+            if (teamMembers.length === 0 && !skipDefaults) {
                 console.log('No team members found, creating defaults...');
                 teamMembers = [
                     { name: 'John Doe', color: '#ce2828', profilePicture: '' },
@@ -546,6 +565,11 @@ async function loadTeamMembers(skipDefaults = false) {
                 if (!isSaving) {
                     isSaving = true;
                     saveTeamMembers().catch(err => console.error('Failed to save default team members:', err)).finally(() => { isSaving = false; });
+                }
+            } else if (teamMembers.length > 0 || leadershipMembers.length > 0) {
+                if (!isSaving) {
+                    isSaving = true;
+                    saveTeamMembers().catch(err => console.error('Failed to re-save restored team members to Supabase:', err)).finally(() => { isSaving = false; });
                 }
             }
         }
@@ -598,21 +622,35 @@ async function loadClients(skipDefaults = false) {
                 name: c.name,
                 color: c.color
             }));
-        } else if (!skipDefaults) {
-            // Only create defaults on initial load, not on real-time updates
-            // Default data if empty
-            console.log('No clients found, creating defaults...');
-            clients = [
-                { name: 'Client A', color: '#667eea' },
-                { name: 'Client B', color: '#764ba2' },
-                { name: 'Client C', color: '#f093fb' }
-            ];
-            // Save defaults to database (don't await - let it happen in background)
-            if (!isSaving) {
-                isSaving = true;
-                saveClients().catch(err => console.error('Failed to save default clients:', err)).finally(() => {
-                    isSaving = false;
-                });
+        } else {
+            // Supabase has no clients: try localStorage backup before defaults
+            const savedClients = localStorage.getItem('clients');
+            if (savedClients) {
+                try {
+                    const parsed = JSON.parse(savedClients);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        clients = parsed;
+                        console.log('📥 Restored', clients.length, 'clients from localStorage backup');
+                        if (!isSaving) {
+                            isSaving = true;
+                            saveClients().catch(err => console.error('Failed to re-save restored clients to Supabase:', err)).finally(() => { isSaving = false; });
+                        }
+                    }
+                } catch (_) {}
+            }
+            if (clients.length === 0 && !skipDefaults) {
+                console.log('No clients found, creating defaults...');
+                clients = [
+                    { name: 'Client A', color: '#667eea' },
+                    { name: 'Client B', color: '#764ba2' },
+                    { name: 'Client C', color: '#f093fb' }
+                ];
+                if (!isSaving) {
+                    isSaving = true;
+                    saveClients().catch(err => console.error('Failed to save default clients:', err)).finally(() => {
+                        isSaving = false;
+                    });
+                }
             }
         }
     } catch (error) {
@@ -693,10 +731,37 @@ async function loadSchedule() {
                 raw[key] = val;
             });
         }
+        // If Supabase has no schedule data, try to restore from localStorage backup
+        if (Object.keys(raw).length === 0) {
+            const savedSchedule = localStorage.getItem('schedule');
+            const savedLeadership = localStorage.getItem('leadershipSchedule');
+            if (savedSchedule) {
+                try {
+                    const parsed = JSON.parse(savedSchedule);
+                    if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+                        Object.assign(raw, parsed);
+                        console.log('📥 Restored schedule from localStorage backup (' + Object.keys(parsed).length + ' block keys)');
+                    }
+                } catch (_) {}
+            }
+            if (savedLeadership) {
+                try {
+                    const parsed = JSON.parse(savedLeadership);
+                    if (parsed && typeof parsed === 'object') {
+                        Object.keys(parsed).forEach(k => { raw[k] = parsed[k]; });
+                        console.log('📥 Restored leadership schedule from localStorage backup');
+                    }
+                } catch (_) {}
+            }
+        }
         Object.keys(raw).forEach(key => {
             if (raw[key] && !Array.isArray(raw[key])) raw[key] = [raw[key]];
         });
         splitScheduleAfterLoad(raw);
+        // If we restored from localStorage, push back to Supabase so data is not lost again
+        if (Object.keys(raw).length > 0 && data && data.length === 0) {
+            saveSchedule().catch(err => console.error('Failed to re-save restored schedule to Supabase:', err));
+        }
     } catch (error) {
         console.error('Error loading schedule:', error);
         const savedSchedule = localStorage.getItem('schedule');
@@ -945,6 +1010,10 @@ async function saveTeamMembers() {
             if (error) throw error;
             console.log('✅ Saved', teamMembers.length, 'production +', leadershipMembers.length, 'leadership members to Supabase');
         }
+        try {
+            localStorage.setItem('teamMembers', JSON.stringify(teamMembers));
+            localStorage.setItem('leadershipMembers', JSON.stringify(leadershipMembers));
+        } catch (_) {}
     } catch (error) {
         console.error('Error saving team members:', error);
         localStorage.setItem('teamMembers', JSON.stringify(teamMembers));
@@ -987,9 +1056,11 @@ async function saveClients() {
             
             if (error) throw error;
         }
+        try {
+            localStorage.setItem('clients', JSON.stringify(clients));
+        } catch (_) {}
     } catch (error) {
         console.error('Error saving clients:', error);
-        // Fallback to localStorage
         localStorage.setItem('clients', JSON.stringify(clients));
     }
 }
@@ -1026,6 +1097,11 @@ async function saveSchedule() {
                 .insert(scheduleEntries);
             if (error) throw error;
         }
+        // Always keep localStorage as backup so we can restore if Supabase is ever empty
+        try {
+            localStorage.setItem('schedule', JSON.stringify(schedule));
+            localStorage.setItem('leadershipSchedule', JSON.stringify(leadershipSchedule));
+        } catch (_) {}
     } catch (error) {
         console.error('Error saving schedule:', error);
         localStorage.setItem('schedule', JSON.stringify(schedule));
@@ -1321,14 +1397,17 @@ function renderCalendar() {
                 timeBlock.textContent = 'Lunch';
             } else {
                 const blockKey = `${dateKey}-${block.id}`;
-                // Only show assignments for production members (exclude leadership members)
-                const productionMemberNames = new Set(teamMembers.map(m => m.name));
-                const assignments = (schedule[blockKey] || []).filter(a => productionMemberNames.has(a.member));
+                // Show all assignments in schedule; only hide leadership (they have their own board)
+                const leadershipMemberNames = new Set(leadershipMembers.map(m => m.name));
+                const rawList = schedule[blockKey] || [];
+                const assignmentsWithIndex = rawList
+                    .map((a, i) => ({ assignment: a, realIndex: i }))
+                    .filter(({ assignment: a }) => a && !leadershipMemberNames.has(a.member));
 
-                // Sort assignments alphabetically by member name
-                const sortedAssignments = [...assignments].sort((a, b) => {
-                    const nameA = (a.member || '').toLowerCase();
-                    const nameB = (b.member || '').toLowerCase();
+                // Sort by member name (keep realIndex for remove/edit)
+                const sortedAssignments = [...assignmentsWithIndex].sort((a, b) => {
+                    const nameA = (a.assignment.member || '').toLowerCase();
+                    const nameB = (b.assignment.member || '').toLowerCase();
                     return nameA.localeCompare(nameB);
                 });
 
@@ -1336,27 +1415,11 @@ function renderCalendar() {
                 const assignmentsContainer = document.createElement('div');
                 assignmentsContainer.className = 'assignments-container';
 
-                // Track which original indices we've already used to handle duplicates
-                const usedIndices = new Set();
-                sortedAssignments.forEach((assignment, sortedIndex) => {
+                sortedAssignments.forEach(({ assignment, realIndex }) => {
                     if (!assignment || typeof assignment !== 'object') return;
+                    const originalIndex = realIndex;
                     const mem = assignment.member != null ? String(assignment.member) : '';
                     const cli = assignment.client != null ? String(assignment.client) : '';
-                    let originalIndex = -1;
-                    for (let i = 0; i < assignments.length; i++) {
-                        if (!usedIndices.has(i) && 
-                            assignments[i].member === assignment.member && 
-                            assignments[i].client === assignment.client) {
-                            originalIndex = i;
-                            usedIndices.add(i);
-                            break;
-                        }
-                    }
-                    if (originalIndex === -1) {
-                        originalIndex = assignments.findIndex(a => 
-                            a && a.member === assignment.member && a.client === assignment.client
-                        );
-                    }
                     
                     const member = teamMembers.find(m => m.name === mem);
                     const client = clients.find(c => c.name === cli);
@@ -3560,7 +3623,7 @@ function updateStats() {
         clientHours[client.name] = 0;
     });
     
-    // Count hours from schedule - ONLY for the current week
+    // Count hours from schedule - ONLY for the current week (include any member name that appears)
     days.forEach((day, dayIndex) => {
         const dayDate = new Date(currentWeekStart);
         dayDate.setDate(currentWeekStart.getDate() + dayIndex);
@@ -3577,9 +3640,8 @@ function updateStats() {
             if (Array.isArray(assignments)) {
                 assignments.forEach(assignment => {
                     if (!assignment || !assignment.member || !assignment.client) return;
-                    if (personHours.hasOwnProperty(assignment.member)) {
-                        personHours[assignment.member] += blockHours;
-                    }
+                    // Count hours for any member (so names in DB that aren't in current team still show)
+                    personHours[assignment.member] = (personHours[assignment.member] || 0) + blockHours;
                     if (clientHours.hasOwnProperty(assignment.client)) {
                         clientHours[assignment.client] += blockHours;
                     }

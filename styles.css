@@ -2266,8 +2266,20 @@ body.bright-theme .leadership-day-nav-arrow:hover {
     min-width: 100px;
 }
 
+.leadership-day-nav-label.today {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.25);
+    padding: 0.25rem 0.5rem;
+    border-radius: 6px;
+}
+
 body.bright-theme .leadership-day-nav-label {
     color: var(--bright-primary);
+}
+
+body.bright-theme .leadership-day-nav-label.today {
+    color: #1a1a1a;
+    background: rgba(0, 0, 0, 0.12);
 }
 
 .leadership-day-btn {

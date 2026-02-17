@@ -1799,6 +1799,39 @@ function formatDateKey(date, day) {
     return `${year}-${month}-${dayNum}-${day}`;
 }
 
+// Day names for calendar (getDay(): 0=Sun .. 6=Sat)
+const DAY_NAMES_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+function getDayNameFromDate(date) {
+    return DAY_NAMES_FULL[date.getDay()];
+}
+
+function isSameCalendarDay(a, b) {
+    return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+// Resolve current leadership date (from storage or today), optionally persist
+function getCurrentLeadershipDate() {
+    if (currentLeadershipDate) return currentLeadershipDate;
+    const saved = localStorage.getItem('leadershipSelectedDate');
+    if (saved) {
+        const [y, m, d] = saved.split('-').map(Number);
+        if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+            currentLeadershipDate = new Date(y, m - 1, d);
+            return currentLeadershipDate;
+        }
+    }
+    currentLeadershipDate = new Date();
+    currentLeadershipDate.setHours(0, 0, 0, 0);
+    return currentLeadershipDate;
+}
+
+function setCurrentLeadershipDate(date) {
+    currentLeadershipDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    localStorage.setItem('leadershipSelectedDate',
+        `${currentLeadershipDate.getFullYear()}-${String(currentLeadershipDate.getMonth() + 1).padStart(2, '0')}-${String(currentLeadershipDate.getDate()).padStart(2, '0')}`);
+}
+
 // Handle drop event for team members
 function handleDrop(e, blockKey) {
     const data = e.dataTransfer.getData('text/plain');
@@ -3792,7 +3825,8 @@ function applyViewModeRestrictions() {
 
 // Leadership Mode
 let isLeadershipMode = false;
-let currentLeadershipDayIndex = 0; // 0=Mon .. 4=Fri; which day is shown in leadership columns
+// Actual calendar date for leadership view (prev/next move by 1 day through the year)
+let currentLeadershipDate = null; // Date; null = use today and persist
 let leadershipDragState = null; // { memberIndex, startMinutes, startY, currentMinutes, isDragging }
 let leadershipMouseDownState = null; // { time, y, timeout }
 let leadershipEditingEntry = null; // { entry, blockKey, assignment, memberIndex }
@@ -3834,24 +3868,40 @@ function renderLeadershipMode() {
     const membersHeader = document.getElementById('leadershipMembersHeader');
     const timeColumn = document.getElementById('leadershipTimeColumn');
     const grid = document.getElementById('leadershipGrid');
-    const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-    
-    // Day nav: update label and wire prev/next (row under members, left-aligned, Toggl-style)
+
+    // Day nav: calendar date (prev/next = previous/next day), label shows "Today" when today + day number
     const dayLabelEl = document.getElementById('leadershipDayLabel');
     const dayPrevBtn = document.getElementById('leadershipDayPrev');
     const dayNextBtn = document.getElementById('leadershipDayNext');
-    if (dayLabelEl) dayLabelEl.textContent = dayNames[currentLeadershipDayIndex];
+
+    function updateLeadershipDayLabel() {
+        if (!dayLabelEl) return;
+        const d = getCurrentLeadershipDate();
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const isToday = isSameCalendarDay(d, today);
+        const dayNum = d.getDate();
+        const dayText = isToday ? 'Today' : getDayNameFromDate(d);
+        dayLabelEl.textContent = `${dayText} ${dayNum}`;
+        dayLabelEl.classList.toggle('today', isToday);
+    }
+
+    updateLeadershipDayLabel();
     if (dayPrevBtn) {
         dayPrevBtn.onclick = () => {
-            currentLeadershipDayIndex = (currentLeadershipDayIndex - 1 + 5) % 5;
-            if (dayLabelEl) dayLabelEl.textContent = dayNames[currentLeadershipDayIndex];
+            const d = getCurrentLeadershipDate();
+            d.setDate(d.getDate() - 1);
+            setCurrentLeadershipDate(d);
+            updateLeadershipDayLabel();
             renderAllLeadershipTimeEntries();
         };
     }
     if (dayNextBtn) {
         dayNextBtn.onclick = () => {
-            currentLeadershipDayIndex = (currentLeadershipDayIndex + 1) % 5;
-            if (dayLabelEl) dayLabelEl.textContent = dayNames[currentLeadershipDayIndex];
+            const d = getCurrentLeadershipDate();
+            d.setDate(d.getDate() + 1);
+            setCurrentLeadershipDate(d);
+            updateLeadershipDayLabel();
             renderAllLeadershipTimeEntries();
         };
     }
@@ -4202,17 +4252,14 @@ function renderOneLeadershipEntry(memberColumn, blockKey, assignment, assignment
 
 // Render all time entries for the leadership (hourly) view. Uses both timeBlocks and direct schedule keys
 // so that hourly leadership entries always show even if the block list differs.
-// Only renders the currently selected day (currentLeadershipDayIndex) so placement matches creation.
+// Only renders the currently selected calendar day (currentLeadershipDate) so placement matches creation.
 function renderAllLeadershipTimeEntries() {
     document.querySelectorAll('.leadership-time-entry:not(.leadership-drag-preview)').forEach(el => el.remove());
 
-    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
     const membersToSearch = isLeadershipMode ? leadershipMembers : teamMembers;
     const renderedKeys = new Set();
-    const dayIdx = currentLeadershipDayIndex;
-    const dayName = days[dayIdx];
-    const dayDate = new Date(currentWeekStart);
-    dayDate.setDate(currentWeekStart.getDate() + dayIdx);
+    const dayDate = getCurrentLeadershipDate();
+    const dayName = getDayNameFromDate(dayDate);
     const dayDateKey = formatDateKey(dayDate, dayName);
 
     // From leadershipSchedule keys for this day only (key format: dayDateKey-leadership-start-end)
@@ -4372,10 +4419,8 @@ function createLeadershipTimeEntry(memberIndex, startMinutes, endMinutes, client
     // Create a unique block ID for this time range
     const blockId = `leadership-${startMinutes}-${endMinutes}`;
     
-    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-    const dayName = days[currentLeadershipDayIndex];
-    const dayDate = new Date(currentWeekStart);
-    dayDate.setDate(currentWeekStart.getDate() + currentLeadershipDayIndex);
+    const dayDate = getCurrentLeadershipDate();
+    const dayName = getDayNameFromDate(dayDate);
     const dayDateKey = formatDateKey(dayDate, dayName);
     const blockKey = `${dayDateKey}-${blockId}`;
     

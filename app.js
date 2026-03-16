@@ -61,6 +61,26 @@ function isLeadershipBlockKey(key) {
     return typeof key === 'string' && key.indexOf('-leadership-') !== -1;
 }
 
+function normalizeProductionBlockKey(key) {
+    if (!key || typeof key !== 'string') return key;
+    if (isLeadershipBlockKey(key)) return key;
+
+    // Expected: YYYY-MM-DD-DayName-BlockId (BlockId may contain dashes)
+    const parts = key.split('-');
+    if (parts.length < 5) return key;
+    const y = Number(parts[0]);
+    const m = Number(parts[1]);
+    const d = Number(parts[2]);
+    if (isNaN(y) || isNaN(m) || isNaN(d)) return key;
+
+    const date = new Date(y, m - 1, d);
+    if (isNaN(date.getTime())) return key;
+
+    const actualDayName = getDayNameFromDate(date);
+    const blockId = parts.slice(4).join('-');
+    return `${String(y).padStart(4, '0')}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}-${actualDayName}-${blockId}`;
+}
+
 // Derive clients list from projects (unique clientName with color from first project)
 function getDerivedClientsFromProjects() {
     const byName = {};
@@ -886,10 +906,11 @@ function splitScheduleAfterLoad(raw) {
         let arr = raw[key];
         if (!Array.isArray(arr)) arr = arr != null ? [arr] : [];
         arr = arr.filter(a => a && typeof a === 'object');
-        if (isLeadershipBlockKey(key)) {
-            leadershipSchedule[key] = arr;
+        const normalizedKey = normalizeProductionBlockKey(key);
+        if (isLeadershipBlockKey(normalizedKey)) {
+            leadershipSchedule[normalizedKey] = arr;
         } else {
-            schedule[key] = arr;
+            schedule[normalizedKey] = arr;
         }
     });
 }

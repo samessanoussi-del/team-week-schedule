@@ -2,14 +2,73 @@
 let teamMembers = []; // Format: [{ name: "John", color: "#ce2828", profilePicture: "data:image/..." }, ...]
 let leadershipMembers = []; // Format: [{ name: "John", color: "#ce2828", profilePicture: "data:image/..." }, ...]
 let clients = []; // Format: [{ name: "Client A", color: "#667eea" }, ...]
-let schedule = {}; // Production only: { "2024-01-15-Monday-Work1": [{ member: "John", client: "Client A" }, ...] }
-let leadershipSchedule = {}; // Leadership only: { "2024-01-15-Monday-leadership-480-540": [{ member: "Jane", client: "Client A" }, ...] }
+let schedule = {}; // Production only: { "2024-01-15-Monday-Work1": [{ member: "John", client: "Client A", project?: "Project Name" }, ...] }
+let leadershipSchedule = {}; // Leadership only: same assignment shape with optional project
+let projects = []; // { id?, clientName, name, budget, color } - primary list in Settings; clients derived from projects
 let currentWeekStart = new Date();
 let isDarkTheme = true; // Default to dark theme
 let timeBlocks = []; // Production blocks only (Work1, Work2, Work3, Lunch) - no leadership blocks
 
+// currentWeekStart is stored locally per-device.
+// IMPORTANT: store as local date-only (YYYY-MM-DD) to avoid UTC shifting from toISOString().
+function formatLocalDateOnly(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+}
+
+function getMondayForDate(date) {
+    const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const day = d.getDay(); // 0=Sun..6=Sat
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    const monday = new Date(d);
+    monday.setDate(diff);
+    monday.setHours(0, 0, 0, 0);
+    return monday;
+}
+
+function loadCurrentWeekStartFromLocalStorage() {
+    const raw = localStorage.getItem('currentWeekStart');
+    if (!raw) return null;
+
+    // New format: YYYY-MM-DD
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+        const [y, m, d] = raw.split('-').map(Number);
+        if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+            return getMondayForDate(new Date(y, m - 1, d));
+        }
+    }
+
+    // Back-compat: ISO string / Date.parse-able
+    const parsed = new Date(raw);
+    if (!isNaN(parsed.getTime())) {
+        const monday = getMondayForDate(parsed);
+        // Migrate to safe local format so it won't "shift" again
+        localStorage.setItem('currentWeekStart', formatLocalDateOnly(monday));
+        return monday;
+    }
+
+    return null;
+}
+
+function saveCurrentWeekStartToLocalStorage(date) {
+    const monday = getMondayForDate(date);
+    localStorage.setItem('currentWeekStart', formatLocalDateOnly(monday));
+}
+
 function isLeadershipBlockKey(key) {
     return typeof key === 'string' && key.indexOf('-leadership-') !== -1;
+}
+
+// Derive clients list from projects (unique clientName with color from first project)
+function getDerivedClientsFromProjects() {
+    const byName = {};
+    projects.forEach(p => {
+        const c = p.clientName || p.name;
+        if (c && !byName[c]) byName[c] = p.color || '#667eea';
+    });
+    return Object.entries(byName).map(([name, color]) => ({ name, color }));
 }
 let isAdminMode = false; // View mode by default
 const ADMIN_PASSWORD = 'Ravie2026';
@@ -508,15 +567,15 @@ async function loadTeamMembers(skipDefaults = false) {
         const savedLeadership = localStorage.getItem('leadershipMembers');
         if (savedMembers) teamMembers = JSON.parse(savedMembers);
         else teamMembers = [
-            { name: 'Kendall', color: '#ce2828', profilePicture: '' },
-            { name: 'Connor', color: '#50c878', profilePicture: '' },
-            { name: 'Chaewon', color: '#4a90e2', profilePicture: '' },
-            { name: 'Game Time', color: '#e2a84a', profilePicture: '' }
+            { name: 'Kendall', color: '#ce2828', profilePicture: '', hourlyRate: 30 },
+            { name: 'Connor', color: '#50c878', profilePicture: '', hourlyRate: 28 },
+            { name: 'Chaewon', color: '#4a90e2', profilePicture: '', hourlyRate: 29 },
+            { name: 'Game Time', color: '#e2a84a', profilePicture: '', hourlyRate: null }
         ];
         if (savedLeadership) leadershipMembers = JSON.parse(savedLeadership);
         else leadershipMembers = [
-            { name: 'Sam', color: '#e2a84a', profilePicture: '' },
-            { name: 'Will', color: '#9b59b6', profilePicture: '' }
+            { name: 'Sam', color: '#e2a84a', profilePicture: '', hourlyRate: 49 },
+            { name: 'Will', color: '#9b59b6', profilePicture: '', hourlyRate: 49 }
         ];
         return;
     }
@@ -533,10 +592,15 @@ async function loadTeamMembers(skipDefaults = false) {
             const base = (m) => ({
                 name: m.name,
                 color: m.color,
-                profilePicture: m.profile_picture || ''
+                profilePicture: m.profile_picture || '',
+                hourlyRate: m.hourly_rate != null ? Number(m.hourly_rate) : null
             });
             teamMembers = data.filter(m => !m.is_leadership).map(base);
             leadershipMembers = data.filter(m => m.is_leadership).map(base);
+            // #region agent log
+            var _lead = leadershipMembers.slice(0, 3).map(m => ({ name: m.name, hourlyRate: m.hourlyRate }));
+            fetch('http://127.0.0.1:7242/ingest/ec7ef1a8-7389-4213-a659-4b03335bac18',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:loadTeamMembers',message:'from Supabase',data:{leadershipSample:_lead},timestamp:Date.now(),hypothesisId:'H5'})}).catch(()=>{});
+            // #endregion
             // One-time: if production members are wrong (old defaults or all 5 in production), restore correct split
             const oldDefaultNames = ['John Doe', 'Jane Smith', 'Bob Johnson'];
             const currentProdNames = teamMembers.map(m => m.name).sort().join(',');
@@ -546,18 +610,18 @@ async function loadTeamMembers(skipDefaults = false) {
             if (hasWrongProduction) {
                 const nameMap = { 'John Doe': 'Kendall', 'Jane Smith': 'Chaewon', 'Bob Johnson': 'Connor' };
                 teamMembers = [
-                    { name: 'Kendall', color: '#ce2828', profilePicture: '' },
-                    { name: 'Connor', color: '#50c878', profilePicture: '' },
-                    { name: 'Chaewon', color: '#4a90e2', profilePicture: '' },
-                    { name: 'Game Time', color: '#e2a84a', profilePicture: '' }
+                    { name: 'Kendall', color: '#ce2828', profilePicture: '', hourlyRate: 30 },
+                    { name: 'Connor', color: '#50c878', profilePicture: '', hourlyRate: 28 },
+                    { name: 'Chaewon', color: '#4a90e2', profilePicture: '', hourlyRate: 29 },
+                    { name: 'Game Time', color: '#e2a84a', profilePicture: '', hourlyRate: null }
                 ];
                 const defaultLeadership = [
-                    { name: 'Sam', color: '#e2a84a', profilePicture: '' },
-                    { name: 'Will', color: '#9b59b6', profilePicture: '' }
+                    { name: 'Sam', color: '#e2a84a', profilePicture: '', hourlyRate: 49 },
+                    { name: 'Will', color: '#9b59b6', profilePicture: '', hourlyRate: 49 }
                 ];
                 leadershipMembers = defaultLeadership.map(def => {
                     const existing = leadershipMembers.find(m => m.name === def.name);
-                    return existing ? { ...def, profilePicture: existing.profilePicture || def.profilePicture, color: existing.color || def.color } : def;
+                    return existing ? { ...def, profilePicture: existing.profilePicture || def.profilePicture, color: existing.color || def.color, hourlyRate: existing.hourlyRate != null ? existing.hourlyRate : def.hourlyRate } : def;
                 });
                 Object.keys(schedule).forEach(key => {
                     if (Array.isArray(schedule[key])) {
@@ -591,6 +655,10 @@ async function loadTeamMembers(skipDefaults = false) {
                     const parsed = JSON.parse(savedLeadership);
                     if (Array.isArray(parsed) && parsed.length > 0) {
                         leadershipMembers = parsed;
+                        // #region agent log
+                        var _lead = leadershipMembers.slice(0, 3).map(m => ({ name: m.name, hourlyRate: m.hourlyRate }));
+                        fetch('http://127.0.0.1:7242/ingest/ec7ef1a8-7389-4213-a659-4b03335bac18',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:loadTeamMembers',message:'from localStorage backup',data:{leadershipSample:_lead},timestamp:Date.now(),hypothesisId:'H5'})}).catch(()=>{});
+                        // #endregion
                         console.log('📥 Restored', leadershipMembers.length, 'leadership members from localStorage backup');
                     }
                 } catch (_) {}
@@ -598,14 +666,14 @@ async function loadTeamMembers(skipDefaults = false) {
             if (teamMembers.length === 0 && !skipDefaults) {
                 console.log('No team members found, creating defaults...');
                 teamMembers = [
-                    { name: 'Kendall', color: '#ce2828', profilePicture: '' },
-                    { name: 'Connor', color: '#50c878', profilePicture: '' },
-                    { name: 'Chaewon', color: '#4a90e2', profilePicture: '' },
-                    { name: 'Game Time', color: '#e2a84a', profilePicture: '' }
+                    { name: 'Kendall', color: '#ce2828', profilePicture: '', hourlyRate: 30 },
+                    { name: 'Connor', color: '#50c878', profilePicture: '', hourlyRate: 28 },
+                    { name: 'Chaewon', color: '#4a90e2', profilePicture: '', hourlyRate: 29 },
+                    { name: 'Game Time', color: '#e2a84a', profilePicture: '', hourlyRate: null }
                 ];
                 leadershipMembers = leadershipMembers.length ? leadershipMembers : [
-                    { name: 'Sam', color: '#e2a84a', profilePicture: '' },
-                    { name: 'Will', color: '#9b59b6', profilePicture: '' }
+                    { name: 'Sam', color: '#e2a84a', profilePicture: '', hourlyRate: 49 },
+                    { name: 'Will', color: '#9b59b6', profilePicture: '', hourlyRate: 49 }
                 ];
                 if (!isSaving) {
                     isSaving = true;
@@ -624,20 +692,20 @@ async function loadTeamMembers(skipDefaults = false) {
         const savedLeadership = localStorage.getItem('leadershipMembers');
         if (savedMembers) teamMembers = JSON.parse(savedMembers);
         else teamMembers = [
-            { name: 'Kendall', color: '#ce2828', profilePicture: '' },
-            { name: 'Connor', color: '#50c878', profilePicture: '' },
-            { name: 'Chaewon', color: '#4a90e2', profilePicture: '' },
-            { name: 'Game Time', color: '#e2a84a', profilePicture: '' }
+            { name: 'Kendall', color: '#ce2828', profilePicture: '', hourlyRate: 30 },
+            { name: 'Connor', color: '#50c878', profilePicture: '', hourlyRate: 28 },
+            { name: 'Chaewon', color: '#4a90e2', profilePicture: '', hourlyRate: 29 },
+            { name: 'Game Time', color: '#e2a84a', profilePicture: '', hourlyRate: null }
         ];
         if (savedLeadership) leadershipMembers = JSON.parse(savedLeadership);
         else {
             const defaultLeadership = [
-                { name: 'Sam', color: '#e2a84a', profilePicture: '' },
-                { name: 'Will', color: '#9b59b6', profilePicture: '' }
+                { name: 'Sam', color: '#e2a84a', profilePicture: '', hourlyRate: 49 },
+                { name: 'Will', color: '#9b59b6', profilePicture: '', hourlyRate: 49 }
             ];
             leadershipMembers = defaultLeadership.map(def => {
                 const existing = leadershipMembers.find(m => m.name === def.name);
-                return existing ? { ...def, profilePicture: existing.profilePicture || def.profilePicture, color: existing.color || def.color } : def;
+                return existing ? { ...def, profilePicture: existing.profilePicture || def.profilePicture, color: existing.color || def.color, hourlyRate: existing.hourlyRate != null ? existing.hourlyRate : def.hourlyRate } : def;
             });
         }
     }
@@ -722,6 +790,90 @@ async function loadClients(skipDefaults = false) {
                 { name: 'Client C', color: '#f093fb' }
             ];
         }
+    }
+}
+
+// Load projects from Supabase (projects belong to clients; have name and budget).
+async function loadProjects() {
+    if (typeof supabase === 'undefined') {
+        const saved = localStorage.getItem('projects');
+        if (saved) {
+            try {
+                projects = JSON.parse(saved);
+            } catch (_) {
+                projects = [];
+            }
+        } else {
+            projects = [];
+        }
+        return;
+    }
+    try {
+        const { data, error } = await supabase.from('projects').select('*').order('client_name').order('name');
+        if (error) throw error;
+        if (data && data.length > 0) {
+            projects = data.map(p => ({
+                id: p.id,
+                clientName: p.client_name,
+                name: p.name,
+                budget: p.budget != null ? Number(p.budget) : null,
+                color: (p.color || '#667eea')
+            }));
+        } else {
+            const saved = localStorage.getItem('projects');
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    if (Array.isArray(parsed)) projects = parsed;
+                } catch (_) {}
+            }
+            if (projects.length === 0) projects = [];
+        }
+        try {
+            localStorage.setItem('projects', JSON.stringify(projects));
+        } catch (_) {}
+    } catch (err) {
+        console.error('Error loading projects:', err);
+        const saved = localStorage.getItem('projects');
+        if (saved) {
+            try {
+                projects = JSON.parse(saved);
+            } catch (_) {
+                projects = [];
+            }
+        } else {
+            projects = [];
+        }
+    }
+}
+
+// Save projects to Supabase.
+async function saveProjects() {
+    if (typeof supabase === 'undefined') {
+        localStorage.setItem('projects', JSON.stringify(projects));
+        return;
+    }
+    try {
+        const { data: existing } = await supabase.from('projects').select('id');
+        if (existing && existing.length > 0) {
+            const ids = existing.map(p => p.id);
+            const { error: delErr } = await supabase.from('projects').delete().in('id', ids);
+            if (delErr) throw delErr;
+        }
+        if (projects.length > 0) {
+            const rows = projects.map(p => ({
+                client_name: p.clientName,
+                name: p.name,
+                budget: p.budget != null ? Number(p.budget) : null,
+                color: p.color || '#667eea'
+            }));
+            const { error } = await supabase.from('projects').insert(rows);
+            if (error) throw error;
+        }
+        localStorage.setItem('projects', JSON.stringify(projects));
+    } catch (err) {
+        console.error('Error saving projects:', err);
+        localStorage.setItem('projects', JSON.stringify(projects));
     }
 }
 
@@ -851,15 +1003,12 @@ async function loadAppSettings() {
             ];
         }
 
-        const savedWeek = localStorage.getItem('currentWeekStart');
-        if (savedWeek) {
-            currentWeekStart = new Date(savedWeek);
+        const loaded = loadCurrentWeekStartFromLocalStorage();
+        if (loaded) {
+            currentWeekStart = loaded;
         } else {
-            const today = new Date();
-            const day = today.getDay();
-            const diff = today.getDate() - day + (day === 0 ? -6 : 1);
-            currentWeekStart = new Date(today.setDate(diff));
-            currentWeekStart.setHours(0, 0, 0, 0);
+            currentWeekStart = getMondayForDate(new Date());
+            saveCurrentWeekStartToLocalStorage(currentWeekStart);
         }
 
         const savedTheme = localStorage.getItem('isDarkTheme');
@@ -895,17 +1044,13 @@ async function loadAppSettings() {
         }
 
         // Load currentWeekStart from localStorage only (never from Supabase)
-        const savedWeek = localStorage.getItem('currentWeekStart');
-        if (savedWeek) {
-            currentWeekStart = new Date(savedWeek);
+        const loaded = loadCurrentWeekStartFromLocalStorage();
+        if (loaded) {
+            currentWeekStart = loaded;
         } else {
-            const today = new Date();
-            const day = today.getDay();
-            const diff = today.getDate() - day + (day === 0 ? -6 : 1);
-            currentWeekStart = new Date(today.setDate(diff));
-            currentWeekStart.setHours(0, 0, 0, 0);
+            currentWeekStart = getMondayForDate(new Date());
             // Save to localStorage only
-            localStorage.setItem('currentWeekStart', currentWeekStart.toISOString());
+            saveCurrentWeekStartToLocalStorage(currentWeekStart);
         }
 
         // Set defaults if not found
@@ -934,15 +1079,12 @@ async function loadAppSettings() {
             ];
         }
 
-        const savedWeek = localStorage.getItem('currentWeekStart');
-        if (savedWeek) {
-            currentWeekStart = new Date(savedWeek);
+        const loaded = loadCurrentWeekStartFromLocalStorage();
+        if (loaded) {
+            currentWeekStart = loaded;
         } else {
-            const today = new Date();
-            const day = today.getDay();
-            const diff = today.getDate() - day + (day === 0 ? -6 : 1);
-            currentWeekStart = new Date(today.setDate(diff));
-            currentWeekStart.setHours(0, 0, 0, 0);
+            currentWeekStart = getMondayForDate(new Date());
+            saveCurrentWeekStartToLocalStorage(currentWeekStart);
         }
 
         const savedTheme = localStorage.getItem('isDarkTheme');
@@ -966,12 +1108,33 @@ async function loadData() {
 
     await loadClients();
     console.log('Loaded clients:', clients.length);
+
+    await loadProjects();
+    console.log('Loaded projects:', projects.length);
+
+    // Seed projects from clients if empty (default: project name = client name)
+    if (projects.length === 0 && clients.length > 0) {
+        projects = clients.map(c => ({ name: c.name, clientName: c.name, color: c.color, budget: null }));
+        await saveProjects();
+        console.log('Seeded projects from clients');
+    }
+    // Derive clients from projects for sidebar/calendar/assignments
+    if (projects.length > 0) {
+        clients = getDerivedClientsFromProjects();
+    }
     
     await loadSchedule();
     console.log('Loaded schedule entries:', Object.keys(schedule).length);
     
     await loadAppSettings();
     console.log('Loaded time blocks:', timeBlocks.length);
+
+    // After schedule + time blocks are loaded, try to repair legacy UTC-shifted week keys for the currently viewed week.
+    // This is safe and only affects the visible week (Mon–Fri).
+    const migrated = migrateScheduleKeysForViewedWeekIfNeeded();
+    if (migrated) {
+        console.log('✅ Fixed shifted schedule keys for viewed week');
+    }
     
     await loadWeeklyTimeTracking();
 
@@ -1030,9 +1193,15 @@ function undo() {
 
 // Save all members (production + leadership) to Supabase team_members table with is_leadership flag.
 async function saveTeamMembers() {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/ec7ef1a8-7389-4213-a659-4b03335bac18',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:saveTeamMembers',message:'start',data:{leadershipRates:leadershipMembers.map(m=>m.hourlyRate),hasSupabase:typeof supabase!=='undefined'},timestamp:Date.now(),hypothesisId:'H8'})}).catch(()=>{});
+    // #endregion
     if (typeof supabase === 'undefined') {
         localStorage.setItem('teamMembers', JSON.stringify(teamMembers));
         localStorage.setItem('leadershipMembers', JSON.stringify(leadershipMembers));
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/ec7ef1a8-7389-4213-a659-4b03335bac18',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:saveTeamMembers',message:'no Supabase, localStorage only',data:{leadershipRates:leadershipMembers.map(m=>m.hourlyRate)},timestamp:Date.now(),hypothesisId:'H5'})}).catch(()=>{});
+        // #endregion
         return;
     }
 
@@ -1050,12 +1219,14 @@ async function saveTeamMembers() {
             name: m.name,
             color: m.color,
             profile_picture: m.profilePicture || '',
+            hourly_rate: m.hourlyRate != null && m.hourlyRate !== '' ? Number(m.hourlyRate) : null,
             is_leadership: false
         }));
         const leadershipRows = leadershipMembers.map(m => ({
             name: m.name,
             color: m.color,
             profile_picture: m.profilePicture || '',
+            hourly_rate: m.hourlyRate != null && m.hourlyRate !== '' ? Number(m.hourlyRate) : null,
             is_leadership: true
         }));
         const allRows = [...productionRows, ...leadershipRows];
@@ -1068,6 +1239,9 @@ async function saveTeamMembers() {
         try {
             localStorage.setItem('teamMembers', JSON.stringify(teamMembers));
             localStorage.setItem('leadershipMembers', JSON.stringify(leadershipMembers));
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/ec7ef1a8-7389-4213-a659-4b03335bac18',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:saveTeamMembers',message:'after Supabase+localStorage',data:{leadershipRates:leadershipMembers.map(m=>m.hourlyRate)},timestamp:Date.now(),hypothesisId:'H5'})}).catch(()=>{});
+            // #endregion
         } catch (_) {}
     } catch (error) {
         console.error('Error saving team members:', error);
@@ -1287,7 +1461,7 @@ async function saveAppSettings() {
     }
     
     // Always save currentWeekStart to localStorage only (never to Supabase)
-    localStorage.setItem('currentWeekStart', currentWeekStart.toISOString());
+    saveCurrentWeekStartToLocalStorage(currentWeekStart);
 }
 
 // Save data to Supabase (with localStorage fallback)
@@ -1302,6 +1476,7 @@ async function saveData() {
     try {
         await saveTeamMembers();
         await saveClients();
+        await saveProjects();
         await saveSchedule();
         await saveAppSettings();
         await saveWeeklyTimeTracking();
@@ -1820,6 +1995,106 @@ function isSameCalendarDay(a, b) {
     return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
+function getProductionWorkBlockIds() {
+    return (timeBlocks || [])
+        .filter(b => b && typeof b.id === 'string')
+        .filter(b => !b.id.startsWith('leadership-'))
+        .filter(b => b.id !== 'Lunch')
+        .map(b => b.id);
+}
+
+// If previous versions stored week dates shifted by UTC (toISOString), the schedule keys for a given week
+// can end up off-by-one day. This migrates keys for the *currently viewed week* only.
+function migrateScheduleKeysForViewedWeekIfNeeded() {
+    try {
+        const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+        const blockIds = getProductionWorkBlockIds();
+        if (!blockIds.length) return false;
+        if (!schedule || typeof schedule !== 'object') return false;
+
+        const shifts = [-1, 0, 1];
+        const scoreForShift = (shiftDays) => {
+            let score = 0;
+            let candidates = 0;
+            days.forEach((dayLabel, dayIndex) => {
+                const expectedDate = new Date(currentWeekStart);
+                expectedDate.setDate(currentWeekStart.getDate() + dayIndex);
+                expectedDate.setHours(0, 0, 0, 0);
+
+                const shiftedDate = new Date(expectedDate);
+                shiftedDate.setDate(expectedDate.getDate() + shiftDays);
+                shiftedDate.setHours(0, 0, 0, 0);
+
+                const expectedDateKey = formatDateKey(expectedDate, dayLabel);
+                const shiftedDateKey = formatDateKey(shiftedDate, dayLabel); // keep UI day label
+
+                blockIds.forEach(blockId => {
+                    const expectedKey = `${expectedDateKey}-${blockId}`;
+                    const shiftedKey = `${shiftedDateKey}-${blockId}`;
+                    const expectedList = schedule[expectedKey];
+                    const shiftedList = schedule[shiftedKey];
+                    const expectedEmpty = !Array.isArray(expectedList) || expectedList.length === 0;
+                    const shiftedHas = Array.isArray(shiftedList) && shiftedList.length > 0;
+                    if (expectedEmpty) candidates++;
+                    if (expectedEmpty && shiftedHas) score++;
+                });
+            });
+            return { score, candidates };
+        };
+
+        const scored = shifts.map(s => ({ shift: s, ...scoreForShift(s) }));
+        const best = scored.reduce((a, b) => (b.score > a.score ? b : a), scored[0]);
+
+        // If the "no shift" already matches best, or we have nothing to migrate, do nothing.
+        if (!best || best.shift === 0 || best.score === 0) return false;
+
+        console.warn(`[WeekSchedule] Detected shifted schedule keys. Migrating week by ${best.shift} day(s) for viewed week.`);
+
+        let moved = 0;
+        days.forEach((dayLabel, dayIndex) => {
+            const expectedDate = new Date(currentWeekStart);
+            expectedDate.setDate(currentWeekStart.getDate() + dayIndex);
+            expectedDate.setHours(0, 0, 0, 0);
+
+            const shiftedDate = new Date(expectedDate);
+            shiftedDate.setDate(expectedDate.getDate() + best.shift);
+            shiftedDate.setHours(0, 0, 0, 0);
+
+            const expectedDateKey = formatDateKey(expectedDate, dayLabel);
+            const shiftedDateKey = formatDateKey(shiftedDate, dayLabel);
+
+            blockIds.forEach(blockId => {
+                const expectedKey = `${expectedDateKey}-${blockId}`;
+                const shiftedKey = `${shiftedDateKey}-${blockId}`;
+                const expectedList = schedule[expectedKey];
+                const shiftedList = schedule[shiftedKey];
+                const expectedEmpty = !Array.isArray(expectedList) || expectedList.length === 0;
+                const shiftedHas = Array.isArray(shiftedList) && shiftedList.length > 0;
+                if (expectedEmpty && shiftedHas) {
+                    schedule[expectedKey] = shiftedList;
+                    delete schedule[shiftedKey];
+                    moved++;
+                }
+            });
+        });
+
+        if (moved > 0) {
+            try {
+                // Persist the corrected keys so the fix is permanent.
+                saveSchedule().catch(() => {});
+                localStorage.setItem('schedule', JSON.stringify(schedule));
+            } catch (_) {}
+            console.log(`[WeekSchedule] Migrated ${moved} block(s) for viewed week.`);
+            return true;
+        }
+
+        return false;
+    } catch (e) {
+        console.warn('[WeekSchedule] Migration failed:', e);
+        return false;
+    }
+}
+
 // Resolve current leadership date (from storage or today), optionally persist
 function getCurrentLeadershipDate() {
     if (currentLeadershipDate) return currentLeadershipDate;
@@ -1964,24 +2239,38 @@ function showClientModal(memberName, blockKey, assignmentIndex = null) {
     
     clientList.innerHTML = '';
     
+    let currentClient = '';
+    let currentProject = '';
+    if (assignmentIndex !== null && schedule[blockKey] && schedule[blockKey][assignmentIndex]) {
+        const a = schedule[blockKey][assignmentIndex];
+        currentClient = a.client || '';
+        currentProject = a.project || '';
+    }
     if (clients.length === 0) {
         clientList.innerHTML = '<p style="text-align: center; color: #999; padding: 2rem;">No clients available. Add clients in Settings.</p>';
     } else {
         clients.forEach(client => {
             const option = document.createElement('div');
-            option.className = 'client-option';
+            option.className = 'client-option client-option-with-project';
             option.style.borderColor = client.color;
+            const clientProjects = projects.filter(p => p.clientName === client.name);
+            const projectOptions = '<option value="">— No project —</option>' +
+                clientProjects.map(p => `<option value="${(p.name || '').replace(/"/g, '&quot;')}" ${(currentClient === client.name && currentProject === (p.name || '')) ? 'selected' : ''}>${(p.name || '').replace(/</g, '&lt;')}${p.budget != null ? ' ($' + p.budget + ')' : ''}</option>`).join('');
             option.innerHTML = `
                 <div class="client-option-color" style="background-color: ${client.color}"></div>
-                <span>${client.name}</span>
+                <span class="client-option-name">${client.name}</span>
+                <select class="client-project-select" onclick="event.stopPropagation()">
+                    ${projectOptions}
+                </select>
             `;
-            option.onclick = () => {
+            option.onclick = (e) => {
+                if (e.target.classList.contains('client-project-select')) return;
+                const select = option.querySelector('.client-project-select');
+                const projectName = (select && select.value) ? select.value : null;
                 if (assignmentIndex !== null && window.editingAssignment) {
-                    // Editing existing assignment
-                    updateAssignmentClient(blockKey, assignmentIndex, client.name);
+                    updateAssignmentClient(blockKey, assignmentIndex, client.name, projectName);
                 } else {
-                    // New assignment
-                    assignMemberToBlock(memberName, client.name, blockKey);
+                    assignMemberToBlock(memberName, client.name, blockKey, projectName);
                 }
                 closeClientModal();
             };
@@ -1994,13 +2283,18 @@ function showClientModal(memberName, blockKey, assignmentIndex = null) {
     window.currentMemberName = memberName;
 }
 
-// Update assignment client
-function updateAssignmentClient(blockKey, assignmentIndex, newClientName) {
+// Update assignment client (and optional project)
+function updateAssignmentClient(blockKey, assignmentIndex, newClientName, newProjectName = null) {
     if (!isAdminMode) return;
     
     saveStateToHistory();
     if (schedule[blockKey] && Array.isArray(schedule[blockKey]) && schedule[blockKey][assignmentIndex]) {
         schedule[blockKey][assignmentIndex].client = newClientName;
+        if (newProjectName) {
+            schedule[blockKey][assignmentIndex].project = newProjectName;
+        } else {
+            delete schedule[blockKey][assignmentIndex].project;
+        }
         saveData();
         renderCalendar();
         updateStats();
@@ -2014,29 +2308,25 @@ function closeClientModal() {
     modal.classList.remove('show');
 }
 
-// Assign member to block
-function assignMemberToBlock(memberName, clientName, blockKey) {
+// Assign member to block (optional project for budget tracking)
+function assignMemberToBlock(memberName, clientName, blockKey, projectName = null) {
     if (!isAdminMode) return;
     
     if (!schedule[blockKey]) {
         schedule[blockKey] = [];
     }
     
-    // Check if member is already in this block and remove existing assignment
     const existingIndex = schedule[blockKey].findIndex(
         assignment => assignment.member === memberName
     );
-    
-    // If member already exists, remove the old assignment
     if (existingIndex !== -1) {
         schedule[blockKey].splice(existingIndex, 1);
     }
     
     saveStateToHistory();
-    schedule[blockKey].push({
-        member: memberName,
-        client: clientName
-    });
+    const assignment = { member: memberName, client: clientName };
+    if (projectName) assignment.project = projectName;
+    schedule[blockKey].push(assignment);
     saveData();
     renderCalendar();
     updateStats();
@@ -2055,20 +2345,6 @@ function editAssignmentClient(blockKey, assignmentIndex, assignment) {
     
     // Show client selection modal
     showClientModal(assignment.member, blockKey, assignmentIndex);
-}
-
-// Update assignment client
-function updateAssignmentClient(blockKey, assignmentIndex, newClientName) {
-    if (!isAdminMode) return;
-    
-    saveStateToHistory();
-    if (schedule[blockKey] && Array.isArray(schedule[blockKey]) && schedule[blockKey][assignmentIndex]) {
-        schedule[blockKey][assignmentIndex].client = newClientName;
-        saveData();
-        renderCalendar();
-        updateStats();
-    }
-    window.editingAssignment = null;
 }
 
 // Remove assignment
@@ -2175,6 +2451,7 @@ function renderSettings() {
                 </div>
             </div>
             <span class="settings-item-name">${member.name}</span>
+            <span class="settings-item-rate-display">${member.hourlyRate != null && member.hourlyRate !== '' ? '$' + member.hourlyRate : '—'}</span>
             <div class="settings-item-actions" style="${disabledStyle}">
                 <button class="btn-edit" onclick="editMember(${index})" ${disabledAttr}>Edit</button>
                 <button class="btn-delete" onclick="deleteMember(${index})" ${disabledAttr}>Delete</button>
@@ -2209,6 +2486,7 @@ function renderSettings() {
                 </div>
             </div>
             <span class="settings-item-name">${member.name}</span>
+            <span class="settings-item-rate-display">${member.hourlyRate != null && member.hourlyRate !== '' ? '$' + member.hourlyRate : '—'}</span>
             <div class="settings-item-actions" style="${disabledStyle}">
                 <button class="btn-edit" onclick="editLeadershipMember(${index})" ${disabledAttr}>Edit</button>
                 <button class="btn-delete" onclick="deleteLeadershipMember(${index})" ${disabledAttr}>Delete</button>
@@ -2218,26 +2496,112 @@ function renderSettings() {
     });
     }
 
-    if (!clientsList) return;
-    clientsList.innerHTML = '';
-    clients.forEach((client, index) => {
-        const item = document.createElement('div');
-        item.className = 'settings-item';
-        const disabledAttr = isAdminMode ? '' : 'disabled';
-        const disabledStyle = isAdminMode ? '' : 'opacity: 0.5; pointer-events: none;';
-        item.innerHTML = `
-            <div class="settings-item-color-picker" style="${disabledStyle}">
-                <input type="color" id="clientColor${index}" value="${client.color}" 
-                       onchange="updateClientColor(${index}, this.value)" class="color-picker" ${disabledAttr}>
-                <label for="clientColor${index}" class="color-picker-label"></label>
-            </div>
-            <span class="settings-item-name">${client.name}</span>
-            <div class="settings-item-actions" style="${disabledStyle}">
-                <button class="btn-edit btn-edit-icon" onclick="openClientDetail(${index})" ${disabledAttr} title="Edit name, deadline & project stops">&#9998;</button>
-                <button class="btn-delete" onclick="deleteClient(${index})" ${disabledAttr}>Delete</button>
-            </div>
-        `;
-        clientsList.appendChild(item);
+    const projectsList = document.getElementById('projectsSettingsList');
+    if (projectsList) {
+        projectsList.innerHTML = '';
+        projects.forEach((project, index) => {
+            const item = document.createElement('div');
+            item.className = 'settings-item';
+            const disabledAttr = isAdminMode ? '' : 'disabled';
+            const disabledStyle = isAdminMode ? '' : 'opacity: 0.5; pointer-events: none;';
+            item.innerHTML = `
+                <div class="settings-item-color-picker" style="${disabledStyle}">
+                    <input type="color" id="projectColor${index}" value="${project.color || '#667eea'}" 
+                           onchange="updateProjectColor(${index}, this.value)" class="color-picker" ${disabledAttr}>
+                    <label for="projectColor${index}" class="color-picker-label"></label>
+                </div>
+                <span class="settings-item-name">${(project.name || '').replace(/</g, '&lt;')}</span>
+                <div class="settings-item-actions" style="${disabledStyle}">
+                    <button class="btn-edit btn-edit-icon" onclick="openProjectDetail(${index})" ${disabledAttr} title="Edit project (name, client, budget)">&#9998;</button>
+                    <button class="btn-delete" onclick="deleteProject(${index})" ${disabledAttr}>Delete</button>
+                </div>
+            `;
+            projectsList.appendChild(item);
+        });
+    }
+
+    if (isAdminMode) {
+        const reportSection = document.getElementById('leadershipReportsSection');
+        if (reportSection) {
+            reportSection.style.display = 'block';
+            renderLeadershipReports();
+        }
+    } else {
+        const reportSection = document.getElementById('leadershipReportsSection');
+        if (reportSection) reportSection.style.display = 'none';
+    }
+}
+
+function renderLeadershipReports() {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/ec7ef1a8-7389-4213-a659-4b03335bac18',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:renderLeadershipReports',message:'entry',data:{reportPeriodWeekStart:typeof window.reportPeriodWeekStart!=='undefined'?String(window.reportPeriodWeekStart):'undef',currentWeekStart:currentWeekStart?currentWeekStart.toISOString():null,scheduleKeys:Object.keys(schedule).length,leadershipScheduleKeys:Object.keys(leadershipSchedule).length},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{});
+    // #endregion
+    if (typeof window.reportPeriodWeekStart === 'undefined') {
+        window.reportPeriodWeekStart = new Date(currentWeekStart);
+    }
+    const weekStart = window.reportPeriodWeekStart;
+    const periodLabel = document.getElementById('reportPeriodLabel');
+    const tbody = document.getElementById('projectsDataTableBody');
+    if (!periodLabel || !tbody) return;
+
+    if (weekStart === null) {
+        periodLabel.textContent = 'All time';
+    } else {
+        const we = new Date(weekStart);
+        we.setDate(we.getDate() + 4);
+        const opts = { month: 'short', day: 'numeric', year: 'numeric' };
+        periodLabel.textContent = weekStart.toLocaleDateString('en-US', opts) + ' – ' + we.toLocaleDateString('en-US', opts);
+    }
+
+    const { byProject } = aggregateHoursAndCostByClientAndProject(weekStart);
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/ec7ef1a8-7389-4213-a659-4b03335bac18',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:renderLeadershipReports',message:'after aggregate',data:{byProjectKeys:Object.keys(byProject).length,byProjectSample:Object.keys(byProject).slice(0,3)},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{});
+    // #endregion
+    const projectEntries = Object.entries(byProject)
+        .filter(([, v]) => v.hours > 0)
+        .sort((a, b) => b[1].cost - a[1].cost);
+
+    tbody.innerHTML = '';
+    if (projectEntries.length === 0) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = '<td colspan="6" class="report-empty">No project data for this period.</td>';
+        tbody.appendChild(tr);
+    } else {
+        projectEntries.forEach(([, v]) => {
+            const projectLabel = (v.clientName || '').replace(/</g, '&lt;') + (v.projectName && v.projectName !== v.clientName ? ' → ' + (v.projectName || '').replace(/</g, '&lt;') : '');
+            const budgetStr = v.budget != null ? `$${Math.round(v.budget)}` : '—';
+            const pctUsed = v.budget != null && v.budget > 0
+                ? ((v.cost / v.budget) * 100).toFixed(1) + '%'
+                : '—';
+            const spentStr = `$${Math.round(v.cost)}`;
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td class="report-name">${projectLabel || '—'}</td><td>${v.hours.toFixed(1)}</td><td>${spentStr}</td><td>${budgetStr}</td><td>${pctUsed}</td><td>${spentStr}</td>`;
+            tbody.appendChild(tr);
+        });
+    }
+}
+
+function initLeadershipReportButtons() {
+    const prevBtn = document.getElementById('reportWeekPrev');
+    const nextBtn = document.getElementById('reportWeekNext');
+    const allTimeBtn = document.getElementById('reportShowAllTime');
+    if (prevBtn) prevBtn.addEventListener('click', () => {
+        if (window.reportPeriodWeekStart === null) window.reportPeriodWeekStart = new Date(currentWeekStart);
+        const w = window.reportPeriodWeekStart ? new Date(window.reportPeriodWeekStart) : new Date(currentWeekStart);
+        w.setDate(w.getDate() - 7);
+        window.reportPeriodWeekStart = w;
+        renderLeadershipReports();
+    });
+    if (nextBtn) nextBtn.addEventListener('click', () => {
+        if (window.reportPeriodWeekStart === null) window.reportPeriodWeekStart = new Date(currentWeekStart);
+        const w = window.reportPeriodWeekStart ? new Date(window.reportPeriodWeekStart) : new Date(currentWeekStart);
+        w.setDate(w.getDate() + 7);
+        window.reportPeriodWeekStart = w;
+        renderLeadershipReports();
+    });
+    if (allTimeBtn) allTimeBtn.addEventListener('click', () => {
+        window.reportPeriodWeekStart = null;
+        renderLeadershipReports();
     });
 }
 
@@ -2589,6 +2953,7 @@ function setupEventListeners() {
     const backToScheduleBtn = document.getElementById('backToScheduleBtn');
     if (backToScheduleBtn) {
         backToScheduleBtn.addEventListener('click', () => {
+            syncLeadershipRatesFromSettingsForm();
             const sp = document.getElementById('settingsPage');
             const dp = document.getElementById('dashboardPage');
             const scheduleView = document.getElementById('scheduleView');
@@ -2782,7 +3147,10 @@ function setupEventListeners() {
     }
     const closeSettings = document.getElementById('closeSettings');
     if (closeSettings) {
-        closeSettings.addEventListener('click', () => document.getElementById('settingsModal').classList.remove('show'));
+        closeSettings.addEventListener('click', () => {
+            syncLeadershipRatesFromSettingsForm();
+            document.getElementById('settingsModal').classList.remove('show');
+        });
     }
 
     // Admin modal close button
@@ -2844,26 +3212,15 @@ function setupEventListeners() {
     // Client modal
     document.getElementById('closeClientModal').addEventListener('click', closeClientModal);
     document.getElementById('closeMemberModal').addEventListener('click', closeMemberModal);
+    const closeEditMemberModalBtn = document.getElementById('closeEditMemberModal');
+    if (closeEditMemberModalBtn) closeEditMemberModalBtn.addEventListener('click', () => { document.getElementById('editMemberModal').classList.remove('show'); editMemberState = { type: null, index: -1 }; });
+    const editMemberSaveBtn = document.getElementById('editMemberSaveBtn');
+    if (editMemberSaveBtn) editMemberSaveBtn.addEventListener('click', saveEditMemberAndClose);
     const closeClientDetail = document.getElementById('closeClientDetail');
     if (closeClientDetail) {
-        closeClientDetail.addEventListener('click', () => saveClientDetailAndClose());
+        closeClientDetail.addEventListener('click', () => saveProjectDetailAndClose());
     }
-    const addClientStopBtn = document.getElementById('addClientStopBtn');
-    if (addClientStopBtn) {
-        addClientStopBtn.addEventListener('click', () => {
-        const list = document.getElementById('clientDetailStopsList');
-        const row = document.createElement('div');
-        row.className = 'client-stop-row';
-        row.style.cssText = 'display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem;';
-        row.innerHTML = `
-            <input type="text" class="input-field client-stop-name" placeholder="e.g. Design" style="flex:1">
-            <input type="date" class="input-field client-stop-due" placeholder="Due">
-            <button type="button" class="btn-delete client-stop-remove">×</button>
-        `;
-        row.querySelector('.client-stop-remove').addEventListener('click', () => row.remove());
-            list.appendChild(row);
-        });
-    }
+    initLeadershipReportButtons();
     
     // Leadership mode
     const leadershipBtn = document.getElementById('leadershipModeBtn');
@@ -2884,6 +3241,7 @@ function setupEventListeners() {
         const watermarkModal = document.getElementById('watermarkModal');
         const settingsModal = document.getElementById('settingsModal');
         if (settingsModal && e.target === settingsModal) {
+            syncLeadershipRatesFromSettingsForm();
             settingsModal.classList.remove('show');
         }
         if (e.target === clientModal) {
@@ -2897,13 +3255,18 @@ function setupEventListeners() {
         if (e.target === leadershipClientModal) {
             closeLeadershipClientModal();
         }
+        const editMemberModal = document.getElementById('editMemberModal');
+        if (editMemberModal && e.target === editMemberModal) {
+            editMemberModal.classList.remove('show');
+            editMemberState = { type: null, index: -1 };
+        }
         const profileModal = document.getElementById('profileModal');
         const clientDetailModal = document.getElementById('clientDetailModal');
         if (e.target === profileModal) {
             profileModal.classList.remove('show');
         }
         if (clientDetailModal && e.target === clientDetailModal) {
-            saveClientDetailAndClose();
+            saveProjectDetailAndClose();
         }
         if (e.target === adminModal) {
             adminModal.classList.remove('show');
@@ -2926,7 +3289,8 @@ function setupEventListeners() {
             teamMembers.push({
                 name: name,
                 color: defaultColors[teamMembers.length % defaultColors.length],
-                profilePicture: ''
+                profilePicture: '',
+                hourlyRate: null
             });
             saveData();
             renderSidebar();
@@ -2950,7 +3314,8 @@ function setupEventListeners() {
                 leadershipMembers.push({
                     name: name,
                     color: defaultColors[leadershipMembers.length % defaultColors.length],
-                    profilePicture: ''
+                    profilePicture: '',
+                    hourlyRate: null
                 });
                 saveData();
                 renderSettings();
@@ -2964,29 +3329,44 @@ function setupEventListeners() {
         });
     }
 
-    // Add client
-    document.getElementById('addClientBtn').addEventListener('click', () => {
-        if (!isAdminMode) return;
-        const input = document.getElementById('newClientName');
-        const name = input.value.trim();
-        if (name && !clients.find(c => c.name === name)) {
+    // Add project (name = project name, client = same by default)
+    const addProjectBtn = document.getElementById('addProjectBtn');
+    if (addProjectBtn) {
+        addProjectBtn.addEventListener('click', () => {
+            if (!isAdminMode) return;
+            const input = document.getElementById('newProjectName');
+            const name = (input && input.value.trim()) ? input.value.trim() : '';
+            if (!name) return;
+            if (projects.some(p => p.clientName === name && p.name === name)) {
+                alert('A project with that name already exists.');
+                return;
+            }
             saveStateToHistory();
             const defaultColors = ['#667eea', '#764ba2', '#f093fb', '#4facfe', '#43e97b', '#fa709a'];
-            clients.push({
+            projects.push({
+                clientName: name,
                 name: name,
-                color: defaultColors[clients.length % defaultColors.length]
+                budget: null,
+                color: defaultColors[projects.length % defaultColors.length]
             });
+            clients = getDerivedClientsFromProjects();
             saveData();
             renderSidebar();
             renderSettings();
-            input.value = '';
-        } else if (clients.find(c => c.name === name)) {
-            alert('Client already exists!');
-        }
-    });
+            if (input) input.value = '';
+        });
+    }
 
-    // Keyboard shortcut for undo (Ctrl+Z)
+    // Keyboard shortcut for undo (Ctrl+Z); Escape closes settings after syncing leadership rates
     document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            const settingsModal = document.getElementById('settingsModal');
+            if (settingsModal && settingsModal.classList.contains('show')) {
+                syncLeadershipRatesFromSettingsForm();
+                settingsModal.classList.remove('show');
+            }
+            return;
+        }
         if (e.ctrlKey && e.key === 'z' && !e.shiftKey) {
             e.preventDefault();
             undo();
@@ -3004,7 +3384,7 @@ function setupEventListeners() {
     document.getElementById('prevWeek').addEventListener('click', () => {
         currentWeekStart.setDate(currentWeekStart.getDate() - 7);
         // Save to localStorage only (not to Supabase)
-        localStorage.setItem('currentWeekStart', currentWeekStart.toISOString());
+        saveCurrentWeekStartToLocalStorage(currentWeekStart);
         renderCalendar();
         updateWeekDisplay();
         updateDayHeaders();
@@ -3018,7 +3398,7 @@ function setupEventListeners() {
     document.getElementById('nextWeek').addEventListener('click', () => {
         currentWeekStart.setDate(currentWeekStart.getDate() + 7);
         // Save to localStorage only (not to Supabase)
-        localStorage.setItem('currentWeekStart', currentWeekStart.toISOString());
+        saveCurrentWeekStartToLocalStorage(currentWeekStart);
         renderCalendar();
         updateWeekDisplay();
         updateDayHeaders();
@@ -3033,7 +3413,7 @@ function setupEventListeners() {
     if (goToCurrentWeekBtn) {
         goToCurrentWeekBtn.addEventListener('click', () => {
             currentWeekStart = getCurrentWeekMonday();
-            localStorage.setItem('currentWeekStart', currentWeekStart.toISOString());
+            saveCurrentWeekStartToLocalStorage(currentWeekStart);
             renderCalendar();
             updateWeekDisplay();
             updateDayHeaders();
@@ -3052,11 +3432,15 @@ function setupEventListeners() {
         }
     });
 
-    document.getElementById('newClientName').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            document.getElementById('addClientBtn').click();
-        }
-    });
+    const newProjectNameEl = document.getElementById('newProjectName');
+    if (newProjectNameEl) {
+        newProjectNameEl.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                const btn = document.getElementById('addProjectBtn');
+                if (btn) btn.click();
+            }
+        });
+    }
     
     // Time tracking week navigation (uses separate week tracking for settings modal)
     window.timeTrackingWeekStart = new Date(currentWeekStart);
@@ -3127,6 +3511,61 @@ function updateMemberColor(index, color) {
     }
 }
 
+function updateMemberHourlyRate(index, value) {
+    if (!isAdminMode) return;
+    const num = value === '' || value === null ? null : parseFloat(value);
+    teamMembers[index].hourlyRate = (num !== null && !isNaN(num) && num >= 0) ? num : null;
+    syncProductionMemberToLeadership(teamMembers[index].name, teamMembers[index]);
+    saveData();
+    renderSettings();
+    updateStats();
+    if (isLeadershipMode) updateStats();
+}
+
+function updateLeadershipMemberHourlyRate(index, value) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/ec7ef1a8-7389-4213-a659-4b03335bac18',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:updateLeadershipMemberHourlyRate',message:'entry',data:{index,value:String(value),isAdminMode:!!isAdminMode},timestamp:Date.now(),hypothesisId:'H4'})}).catch(()=>{});
+    // #endregion
+    if (!isAdminMode) return;
+    const num = value === '' || value === null ? null : parseFloat(value);
+    leadershipMembers[index].hourlyRate = (num !== null && !isNaN(num) && num >= 0) ? num : null;
+    saveData();
+    renderSettings();
+    if (isLeadershipMode) updateStats();
+}
+
+// Sync leadership rate inputs from the settings form into leadershipMembers and save (e.g. when closing settings).
+function syncLeadershipRatesFromSettingsForm() {
+    // #region agent log
+    var _inputsFound = [];
+    leadershipMembers.forEach((_, index) => {
+        var el = document.getElementById('leadershipRate' + index);
+        _inputsFound.push({ index: index, found: !!el, value: el ? el.value : null });
+    });
+    fetch('http://127.0.0.1:7242/ingest/ec7ef1a8-7389-4213-a659-4b03335bac18',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:syncLeadershipRatesFromSettingsForm',message:'entry',data:{isAdminMode:!!isAdminMode,leadershipCount:leadershipMembers.length,inputsFound:_inputsFound},timestamp:Date.now(),hypothesisId:'H6'})}).catch(()=>{});
+    // #endregion
+    if (!isAdminMode) return;
+    let changed = false;
+    leadershipMembers.forEach((member, index) => {
+        const input = document.getElementById('leadershipRate' + index);
+        if (!input) return;
+        const raw = input.value;
+        const num = raw === '' || raw === null ? null : parseFloat(raw);
+        const newRate = (num !== null && !isNaN(num) && num >= 0) ? num : null;
+        if (member.hourlyRate !== newRate) {
+            member.hourlyRate = newRate;
+            changed = true;
+        }
+    });
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/ec7ef1a8-7389-4213-a659-4b03335bac18',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:syncLeadershipRatesFromSettingsForm',message:'after loop',data:{changed:!!changed,ratesNow:leadershipMembers.map(m=>m.hourlyRate)},timestamp:Date.now(),hypothesisId:'H7'})}).catch(()=>{});
+    // #endregion
+    if (changed) {
+        saveData();
+        if (isLeadershipMode) updateStats();
+    }
+}
+
 // Update member profile picture
 function updateMemberProfile(index, input) {
     if (!isAdminMode) return;
@@ -3158,39 +3597,9 @@ function updateClientColor(index, color) {
     updateStats();
 }
 
-// Edit member
+// Edit member (opens modal: name + rate)
 function editMember(index) {
-    const newName = prompt('Enter new name:', teamMembers[index].name);
-    if (newName && newName.trim() && !teamMembers.find(m => m.name === newName.trim())) {
-        saveStateToHistory();
-        const oldName = teamMembers[index].name;
-        teamMembers[index].name = newName.trim();
-        
-        // Update all schedule entries with this member
-        Object.keys(schedule).forEach(key => {
-            if (Array.isArray(schedule[key])) {
-                schedule[key].forEach(assignment => {
-                    if (assignment.member === oldName) {
-                        assignment.member = newName.trim();
-                    }
-                });
-            }
-        });
-        
-        // Sync to leadership members if they're toggled
-        syncProductionMemberToLeadership(oldName, teamMembers[index]);
-        
-        saveData();
-        renderSidebar();
-        renderSettings();
-        renderCalendar();
-        updateStats();
-        if (isLeadershipMode) {
-            renderSidebar(); if (isLeadershipMode) updateStats();
-        }
-    } else if (teamMembers.find(m => m.name === newName.trim())) {
-        alert('Member with this name already exists!');
-    }
+    openEditMemberModal('production', index);
 }
 
 // Delete member
@@ -3257,6 +3666,7 @@ function deleteClient(index) {
     saveStateToHistory();
     const clientName = clients[index].name;
     clients.splice(index, 1);
+    projects = projects.filter(p => p.clientName !== clientName);
     
     Object.keys(schedule).forEach(key => {
         if (Array.isArray(schedule[key])) {
@@ -3277,73 +3687,204 @@ function deleteClient(index) {
     updateStats();
 }
 
-// Client detail modal (deadline, project stops)
-let clientDetailEditingIndex = -1;
+// Project detail modal (project name, client, budget, color)
+let projectDetailEditingIndex = -1;
 
-function openClientDetail(clientIndex) {
+// Edit member modal: 'production' | 'leadership', index
+let editMemberState = { type: null, index: -1 };
+
+function openEditMemberModal(type, index) {
     if (!isAdminMode) return;
-    clientDetailEditingIndex = clientIndex;
-    const client = clients[clientIndex];
-    if (!client) return;
-    const details = clientDetails[client.name] || { deadline: '', stops: [] };
-    if (!details.stops || !Array.isArray(details.stops)) details.stops = [];
-    document.getElementById('clientDetailTitle').textContent = 'Edit client';
-    const nameEl = document.getElementById('clientDetailName');
-    if (nameEl) nameEl.value = client.name;
-    document.getElementById('clientDetailDeadline').value = details.deadline || '';
-    renderClientDetailStops(details.stops);
+    const list = type === 'leadership' ? leadershipMembers : teamMembers;
+    const member = list[index];
+    if (!member) return;
+    editMemberState = { type, index };
+    document.getElementById('editMemberModalTitle').textContent = type === 'leadership' ? 'Edit leadership member' : 'Edit member';
+    document.getElementById('editMemberName').value = member.name || '';
+    document.getElementById('editMemberRate').value = member.hourlyRate != null && member.hourlyRate !== '' ? member.hourlyRate : '';
+    document.getElementById('editMemberModal').classList.add('show');
+}
+
+function saveEditMemberAndClose() {
+    if (editMemberState.type === null || editMemberState.index < 0) return;
+    const nameEl = document.getElementById('editMemberName');
+    const rateEl = document.getElementById('editMemberRate');
+    const newName = (nameEl && nameEl.value.trim()) ? nameEl.value.trim() : '';
+    const rateVal = rateEl && rateEl.value !== '' ? parseFloat(rateEl.value) : null;
+    const newRate = (rateVal != null && !isNaN(rateVal) && rateVal >= 0) ? rateVal : null;
+
+    const list = editMemberState.type === 'leadership' ? leadershipMembers : teamMembers;
+    const current = list[editMemberState.index];
+    if (!current) return;
+    const nameToUse = newName || current.name;
+    if (!nameToUse.trim()) {
+        alert('Name is required.');
+        return;
+    }
+
+    if (editMemberState.type === 'production') {
+        const member = teamMembers[editMemberState.index];
+        if (!member) return;
+        const oldName = member.name;
+        if (nameToUse !== oldName) {
+            if (teamMembers.some(m => m !== member && m.name === nameToUse)) {
+                alert('A member with that name already exists.');
+                return;
+            }
+            saveStateToHistory();
+            member.name = nameToUse;
+            Object.keys(schedule).forEach(key => {
+                if (Array.isArray(schedule[key])) {
+                    schedule[key].forEach(a => { if (a && a.member === oldName) a.member = nameToUse; });
+                }
+            });
+            syncProductionMemberToLeadership(oldName, member);
+        }
+        member.hourlyRate = newRate;
+        syncProductionMemberToLeadership(member.name, member);
+        saveData();
+        renderSidebar();
+        renderSettings();
+        renderCalendar();
+        updateStats();
+    } else {
+        const member = leadershipMembers[editMemberState.index];
+        if (!member) return;
+        const oldName = member.name;
+        if (nameToUse !== oldName) {
+            if (leadershipMembers.some(m => m !== member && m.name === nameToUse)) {
+                alert('A leadership member with that name already exists.');
+                return;
+            }
+            saveStateToHistory();
+            member.name = nameToUse;
+            Object.keys(schedule).forEach(key => {
+                if (Array.isArray(schedule[key])) {
+                    schedule[key].forEach(a => { if (a && a.member === oldName) a.member = nameToUse; });
+                }
+            });
+            Object.keys(leadershipSchedule).forEach(key => {
+                if (Array.isArray(leadershipSchedule[key])) {
+                    leadershipSchedule[key].forEach(a => { if (a && a.member === oldName) a.member = nameToUse; });
+                }
+            });
+        }
+        member.hourlyRate = newRate;
+        saveData();
+        renderSettings();
+        if (isLeadershipMode) { renderSidebar(); updateStats(); }
+    }
+    document.getElementById('editMemberModal').classList.remove('show');
+    editMemberState = { type: null, index: -1 };
+}
+
+function openProjectDetail(projectIndex) {
+    if (!isAdminMode) return;
+    const project = projects[projectIndex];
+    if (!project) return;
+    projectDetailEditingIndex = projectIndex;
+    document.getElementById('clientDetailTitle').textContent = 'Edit project';
+    const nameEl = document.getElementById('projectDetailName');
+    const clientEl = document.getElementById('projectDetailClient');
+    const budgetEl = document.getElementById('projectDetailBudget');
+    const colorEl = document.getElementById('projectDetailColor');
+    if (nameEl) nameEl.value = project.name || '';
+    if (clientEl) clientEl.value = project.clientName || project.name || '';
+    if (budgetEl) budgetEl.value = project.budget != null ? project.budget : '';
+    if (colorEl) colorEl.value = project.color || '#667eea';
     document.getElementById('clientDetailModal').classList.add('show');
 }
 
-function renderClientDetailStops(stops) {
-    const list = document.getElementById('clientDetailStopsList');
-    list.innerHTML = '';
-    (stops || []).forEach((stop, i) => {
-        const row = document.createElement('div');
-        row.className = 'client-stop-row';
-        row.style.cssText = 'display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem;';
-        row.innerHTML = `
-            <input type="text" class="input-field client-stop-name" value="${(stop.name || '').replace(/"/g, '&quot;')}" placeholder="e.g. Design" style="flex:1">
-            <input type="date" class="input-field client-stop-due" value="${stop.due || ''}" placeholder="Due">
-            <button type="button" class="btn-delete client-stop-remove" data-index="${i}">×</button>
-        `;
-        row.querySelector('.client-stop-remove').addEventListener('click', () => row.remove());
-        list.appendChild(row);
-    });
+function saveProjectDetailAndClose() {
+    if (projectDetailEditingIndex < 0) return;
+    const project = projects[projectDetailEditingIndex];
+    if (!project) return;
+    const nameEl = document.getElementById('projectDetailName');
+    const clientEl = document.getElementById('projectDetailClient');
+    const budgetEl = document.getElementById('projectDetailBudget');
+    const colorEl = document.getElementById('projectDetailColor');
+    const newName = (nameEl && nameEl.value.trim()) ? nameEl.value.trim() : project.name;
+    const newClient = (clientEl && clientEl.value.trim()) ? clientEl.value.trim() : (project.clientName || project.name);
+    const budgetVal = budgetEl && budgetEl.value !== '' ? parseFloat(budgetEl.value) : null;
+    const newColor = (colorEl && colorEl.value) ? colorEl.value : (project.color || '#667eea');
+    const oldName = project.name;
+    const oldClient = project.clientName;
+    saveStateToHistory();
+    project.name = newName;
+    project.clientName = newClient;
+    project.budget = (budgetVal != null && !isNaN(budgetVal)) ? budgetVal : null;
+    project.color = newColor;
+    if (oldName !== newName || oldClient !== newClient) {
+        Object.keys(schedule).forEach(key => {
+            if (Array.isArray(schedule[key])) {
+                schedule[key].forEach(a => {
+                    if (a && a.client === oldClient && a.project === oldName) {
+                        a.client = newClient;
+                        a.project = newName;
+                    }
+                });
+            }
+        });
+        Object.keys(leadershipSchedule).forEach(key => {
+            if (Array.isArray(leadershipSchedule[key])) {
+                leadershipSchedule[key].forEach(a => {
+                    if (a && a.client === oldClient && a.project === oldName) {
+                        a.client = newClient;
+                        a.project = newName;
+                    }
+                });
+            }
+        });
+    }
+    clients = getDerivedClientsFromProjects();
+    saveData();
+    renderSidebar();
+    renderSettings();
+    renderCalendar();
+    updateStats();
+    document.getElementById('clientDetailModal').classList.remove('show');
+    projectDetailEditingIndex = -1;
 }
 
-function saveClientDetailAndClose() {
-    if (clientDetailEditingIndex < 0) return;
-    const client = clients[clientDetailEditingIndex];
-    if (!client) return;
-    const nameEl = document.getElementById('clientDetailName');
-    const newName = nameEl && nameEl.value.trim() ? nameEl.value.trim() : client.name;
-    const deadline = document.getElementById('clientDetailDeadline').value || '';
-    const stopRows = document.querySelectorAll('.client-stop-row');
-    const stops = [];
-    stopRows.forEach(row => {
-        const nEl = row.querySelector('.client-stop-name');
-        const dueEl = row.querySelector('.client-stop-due');
-        if (nEl && nEl.value.trim()) {
-            stops.push({ name: nEl.value.trim(), due: dueEl ? dueEl.value : '' });
-        }
-    });
-    const oldName = client.name;
-    if (newName !== oldName && !clients.find(c => c.name === newName && c !== client)) {
-        saveStateToHistory();
-        client.name = newName;
-        if (clientDetails[oldName]) {
-            clientDetails[newName] = clientDetails[oldName];
-            delete clientDetails[oldName];
-        }
+function updateProjectColor(index, color) {
+    if (!isAdminMode) return;
+    if (projects[index]) {
+        projects[index].color = color;
+        clients = getDerivedClientsFromProjects();
         saveData();
         renderSidebar();
+        renderSettings();
+        renderCalendar();
+        updateStats();
     }
-    clientDetails[newName] = { deadline, stops };
-    saveAppSettings();
-    if (newName !== oldName) renderSettings();
-    document.getElementById('clientDetailModal').classList.remove('show');
-    clientDetailEditingIndex = -1;
+}
+
+function deleteProject(index) {
+    if (!isAdminMode) return;
+    const project = projects[index];
+    if (!project) return;
+    saveStateToHistory();
+    const clientName = project.clientName;
+    const projectName = project.name;
+    projects.splice(index, 1);
+    Object.keys(schedule).forEach(key => {
+        if (Array.isArray(schedule[key])) {
+            schedule[key] = schedule[key].filter(a => !(a.client === clientName && a.project === projectName));
+            if (schedule[key].length === 0) delete schedule[key];
+        }
+    });
+    Object.keys(leadershipSchedule).forEach(key => {
+        if (Array.isArray(leadershipSchedule[key])) {
+            leadershipSchedule[key] = leadershipSchedule[key].filter(a => !(a.client === clientName && a.project === projectName));
+            if (leadershipSchedule[key].length === 0) delete leadershipSchedule[key];
+        }
+    });
+    clients = getDerivedClientsFromProjects();
+    saveData();
+    renderSidebar();
+    renderSettings();
+    renderCalendar();
+    updateStats();
 }
 
 // Leadership Member functions
@@ -3355,6 +3896,10 @@ window.updateLeadershipMemberColor = function(index, color) {
     if (isLeadershipMode) {
         renderSidebar(); if (isLeadershipMode) updateStats();
     }
+};
+
+window.updateLeadershipMemberHourlyRate = function(index, value) {
+    updateLeadershipMemberHourlyRate(index, value);
 };
 
 window.updateLeadershipMemberProfile = function(index, input) {
@@ -3375,33 +3920,7 @@ window.updateLeadershipMemberProfile = function(index, input) {
 };
 
 window.editLeadershipMember = function(index) {
-    if (!isAdminMode) return;
-    const newName = prompt('Enter new name:', leadershipMembers[index].name);
-    if (newName && newName.trim() && !leadershipMembers.find(m => m.name === newName.trim())) {
-        saveStateToHistory();
-        const oldName = leadershipMembers[index].name;
-        leadershipMembers[index].name = newName.trim();
-        
-        // Update all schedule entries with this member
-        Object.keys(schedule).forEach(key => {
-            if (Array.isArray(schedule[key])) {
-                schedule[key].forEach(assignment => {
-                    if (assignment.member === oldName) {
-                        assignment.member = newName.trim();
-                    }
-                });
-            }
-        });
-        
-        saveData();
-        renderSettings();
-        if (isLeadershipMode) {
-            renderSidebar(); if (isLeadershipMode) updateStats();
-        }
-        updateStats();
-    } else if (leadershipMembers.find(m => m.name === newName.trim())) {
-        alert('Leadership member with this name already exists!');
-    }
+    openEditMemberModal('leadership', index);
 };
 
 window.deleteLeadershipMember = function(index) {
@@ -3441,7 +3960,8 @@ window.toggleProductionMemberToLeadership = function(index, include) {
             leadershipMembers.push({
                 name: member.name,
                 color: member.color,
-                profilePicture: member.profilePicture
+                profilePicture: member.profilePicture,
+                hourlyRate: member.hourlyRate != null ? member.hourlyRate : null
             });
         }
     } else {
@@ -3694,10 +4214,102 @@ function formatTimeDisplay(timeStr) {
     return convertFrom24Hour(timeStr);
 }
 
+// Helper: get hourly rate for a member name (production or leadership).
+function getMemberHourlyRate(memberName) {
+    const m = teamMembers.find(x => x.name === memberName) || leadershipMembers.find(x => x.name === memberName);
+    return (m && m.hourlyRate != null && !isNaN(m.hourlyRate)) ? Number(m.hourlyRate) : 0;
+}
+
+// Aggregate hours and cost by client and by project for a given week (weekStart = Monday) or all time (weekStart = null).
+function aggregateHoursAndCostByClientAndProject(weekStart) {
+    const byClient = {};
+    const byProject = {};
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+    const weekStartTime = weekStart ? new Date(weekStart).setHours(0, 0, 0, 0) : null;
+    const weekEndTime = weekStart ? weekStartTime + 5 * 24 * 60 * 60 * 1000 : null;
+    // #region agent log
+    var _logAssignmentsWithoutProject = 0;
+    var _logKeysInRangeProd = 0;
+    var _logKeysInRangeLead = 0;
+    var _logAssignmentsWithProject = 0;
+    // #endregion
+
+    function addToClient(clientName, hours, cost) {
+        if (!byClient[clientName]) byClient[clientName] = { hours: 0, cost: 0 };
+        byClient[clientName].hours += hours;
+        byClient[clientName].cost += cost;
+    }
+    function addToProject(clientName, projectName, hours, cost) {
+        const key = clientName + '|' + projectName;
+        if (!byProject[key]) {
+            const proj = projects.find(p => p.clientName === clientName && p.name === projectName);
+            byProject[key] = { clientName, projectName, hours: 0, cost: 0, budget: proj && proj.budget != null ? proj.budget : null };
+        }
+        byProject[key].hours += hours;
+        byProject[key].cost += cost;
+    }
+    function keyInRange(blockKey) {
+        if (!weekStartTime) return true;
+        const parts = blockKey.split('-');
+        if (parts.length < 4) return false;
+        const y = parseInt(parts[0], 10), m = parseInt(parts[1], 10) - 1, d = parseInt(parts[2], 10);
+        const keyDate = new Date(y, m, d).getTime();
+        return keyDate >= weekStartTime && keyDate < weekEndTime;
+    }
+
+    // Production schedule
+    Object.keys(schedule).forEach(blockKey => {
+        var inRange = keyInRange(blockKey);
+        if (inRange) _logKeysInRangeProd++;
+        if (!inRange) return;
+        const assignments = schedule[blockKey] || [];
+        const dateKey = blockKey.split('-').slice(0, 4).join('-');
+        const blockId = blockKey.slice(dateKey.length + 1);
+        const block = timeBlocks.find(b => b.id === blockId);
+        const blockHours = block && !block.isLunch ? (parseInt(block.endTime.split(':')[0], 10) - parseInt(block.startTime.split(':')[0], 10)) : 0;
+        if (blockHours <= 0) return;
+        assignments.forEach(a => {
+            if (!a || !a.member || !a.client) return;
+            if (!a.project) _logAssignmentsWithoutProject++; else _logAssignmentsWithProject++;
+            const rate = getMemberHourlyRate(a.member);
+            const cost = blockHours * rate;
+            addToClient(a.client, blockHours, cost);
+            addToProject(a.client, a.project || a.client, blockHours, cost);
+        });
+    });
+    // Leadership schedule
+    Object.keys(leadershipSchedule).forEach(blockKey => {
+        var inRange = keyInRange(blockKey);
+        if (inRange) _logKeysInRangeLead++;
+        if (!inRange) return;
+        const parts = blockKey.split('-leadership-');
+        if (parts.length < 2) return;
+        const suffix = parts[1];
+        const numParts = suffix.split('-').map(Number);
+        if (numParts.length < 2) return;
+        const blockHours = (numParts[1] - numParts[0]) / 60;
+        const assignments = leadershipSchedule[blockKey] || [];
+        assignments.forEach(a => {
+            if (!a || !a.member || !a.client) return;
+            if (!a.project) _logAssignmentsWithoutProject++; else _logAssignmentsWithProject++;
+            const rate = getMemberHourlyRate(a.member);
+            const cost = blockHours * rate;
+            addToClient(a.client, blockHours, cost);
+            addToProject(a.client, a.project || a.client, blockHours, cost);
+        });
+    });
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/ec7ef1a8-7389-4213-a659-4b03335bac18',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:aggregateHoursAndCostByClientAndProject',message:'exit',data:{weekStart:weekStart?weekStart.toISOString():null,byClientKeys:Object.keys(byClient).length,byProjectKeys:Object.keys(byProject).length,assignmentsWithoutProject:_logAssignmentsWithoutProject,assignmentsWithProject:_logAssignmentsWithProject,keysInRangeProd:_logKeysInRangeProd,keysInRangeLead:_logKeysInRangeLead},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{});
+    // #endregion
+    return { byClient, byProject };
+}
+
 // Calculate and update statistics
 function updateStats() {
     const personHours = {};
+    const personCost = {};
     const clientHours = {};
+    const clientCost = {};
     
     // Calculate hours per block dynamically from timeBlocks
     const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
@@ -3705,16 +4317,21 @@ function updateStats() {
     // Initialize counters (production + leadership members for person hours)
     teamMembers.forEach(member => {
         personHours[member.name] = 0;
+        personCost[member.name] = 0;
     });
     leadershipMembers.forEach(member => {
-        if (!personHours.hasOwnProperty(member.name)) personHours[member.name] = 0;
+        if (!personHours.hasOwnProperty(member.name)) {
+            personHours[member.name] = 0;
+            personCost[member.name] = 0;
+        }
     });
     
     clients.forEach(client => {
         clientHours[client.name] = 0;
+        clientCost[client.name] = 0;
     });
     
-    // Count hours from schedule - ONLY for the current week (include any member name that appears)
+    // Count hours and cost from schedule - ONLY for the current week
     days.forEach((day, dayIndex) => {
         const dayDate = new Date(currentWeekStart);
         dayDate.setDate(currentWeekStart.getDate() + dayIndex);
@@ -3722,7 +4339,7 @@ function updateStats() {
         
         timeBlocks.forEach((block) => {
             if (block.isLunch) return;
-            if (block.id.startsWith('leadership-')) return; // Production stats exclude leadership blocks
+            if (block.id.startsWith('leadership-')) return;
             const blockKey = `${dateKey}-${block.id}`;
             const assignments = schedule[blockKey] || [];
             const startHour = parseInt(block.startTime.split(':')[0]);
@@ -3731,10 +4348,12 @@ function updateStats() {
             if (Array.isArray(assignments)) {
                 assignments.forEach(assignment => {
                     if (!assignment || !assignment.member || !assignment.client) return;
-                    // Count hours for any member (so names in DB that aren't in current team still show)
+                    const rate = getMemberHourlyRate(assignment.member);
                     personHours[assignment.member] = (personHours[assignment.member] || 0) + blockHours;
+                    personCost[assignment.member] = (personCost[assignment.member] || 0) + blockHours * rate;
                     if (clientHours.hasOwnProperty(assignment.client)) {
                         clientHours[assignment.client] += blockHours;
+                        clientCost[assignment.client] += blockHours * rate;
                     }
                 });
             }
@@ -3754,16 +4373,20 @@ function updateStats() {
         const assignments = leadershipSchedule[key] || [];
         assignments.forEach(assignment => {
             if (!assignment || !assignment.member || !assignment.client) return;
+            const rate = getMemberHourlyRate(assignment.member);
             personHours[assignment.member] = (personHours[assignment.member] || 0) + blockHours;
+            personCost[assignment.member] = (personCost[assignment.member] || 0) + blockHours * rate;
             if (clientHours.hasOwnProperty(assignment.client)) {
                 clientHours[assignment.client] += blockHours;
+                clientCost[assignment.client] += blockHours * rate;
             } else {
                 clientHours[assignment.client] = blockHours;
+                clientCost[assignment.client] = blockHours * rate;
             }
         });
     });
     
-    // Render person stats (production + leadership combined)
+    // Render person stats (production + leadership combined) - hours only, no cost on home
     const personStatsDiv = document.getElementById('personStats');
     if (personStatsDiv) {
         personStatsDiv.innerHTML = '';
@@ -3784,7 +4407,7 @@ function updateStats() {
         });
     }
     
-    // Render client stats (production + leadership combined)
+    // Render client stats (production + leadership combined) - hours only, no cost on home
     const clientStatsDiv = document.getElementById('clientStats');
     if (clientStatsDiv) {
         clientStatsDiv.innerHTML = '';
@@ -4311,14 +4934,23 @@ function showLeadershipClientModal(memberIndex, startMinutes, endMinutes) {
     } else {
         clients.forEach(client => {
             const option = document.createElement('div');
-            option.className = 'client-option';
+            option.className = 'client-option client-option-with-project';
             option.style.borderColor = client.color;
+            const clientProjects = projects.filter(p => p.clientName === client.name);
+            const projectOptions = '<option value="">— No project —</option>' +
+                clientProjects.map(p => `<option value="${(p.name || '').replace(/"/g, '&quot;')}">${(p.name || '').replace(/</g, '&lt;')}${p.budget != null ? ' ($' + p.budget + ')' : ''}</option>`).join('');
             option.innerHTML = `
                 <div class="client-option-color" style="background-color: ${client.color}"></div>
-                <span>${client.name}</span>
+                <span class="client-option-name">${client.name}</span>
+                <select class="client-project-select" onclick="event.stopPropagation()">
+                    ${projectOptions}
+                </select>
             `;
-            option.onclick = () => {
-                createLeadershipTimeEntry(memberIndex, startMinutes, endMinutes, client.name);
+            option.onclick = (e) => {
+                if (e.target.classList.contains('client-project-select')) return;
+                const select = option.querySelector('.client-project-select');
+                const projectName = (select && select.value) ? select.value : null;
+                createLeadershipTimeEntry(memberIndex, startMinutes, endMinutes, client.name, projectName);
                 closeLeadershipClientModal();
             };
             clientList.appendChild(option);
@@ -4351,18 +4983,29 @@ function showLeadershipEditModal(entry) {
     } else {
         clients.forEach(client => {
             const option = document.createElement('div');
-            option.className = 'client-option';
+            option.className = 'client-option client-option-with-project';
             option.style.borderColor = client.color;
             if (client.name === assignment.client) {
                 option.style.opacity = '0.5';
             }
+            const clientProjects = projects.filter(p => p.clientName === client.name);
+            const currentProject = assignment.project || '';
+            const projectOptions = '<option value="">— No project —</option>' +
+                clientProjects.map(p => `<option value="${(p.name || '').replace(/"/g, '&quot;')}" ${(client.name === assignment.client && currentProject === (p.name || '')) ? 'selected' : ''}>${(p.name || '').replace(/</g, '&lt;')}${p.budget != null ? ' ($' + p.budget + ')' : ''}</option>`).join('');
             option.innerHTML = `
                 <div class="client-option-color" style="background-color: ${client.color}"></div>
-                <span>${client.name}${client.name === assignment.client ? ' (current)' : ''}</span>
+                <span class="client-option-name">${client.name}${client.name === assignment.client ? ' (current)' : ''}</span>
+                <select class="client-project-select" onclick="event.stopPropagation()">
+                    ${projectOptions}
+                </select>
             `;
-            option.onclick = () => {
+            option.onclick = (e) => {
+                if (e.target.classList.contains('client-project-select')) return;
+                const select = option.querySelector('.client-project-select');
+                const projectName = (select && select.value) ? select.value : null;
                 closeLeadershipClientModal();
                 assignment.client = client.name;
+                if (projectName) assignment.project = projectName; else delete assignment.project;
                 saveData();
                 renderSidebar();
                 if (isLeadershipMode) {
@@ -4414,7 +5057,7 @@ function closeLeadershipClientModal() {
 }
 
 // Create time entry in leadership mode (minute-based). Uses the given start/end range.
-function createLeadershipTimeEntry(memberIndex, startMinutes, endMinutes, clientName) {
+function createLeadershipTimeEntry(memberIndex, startMinutes, endMinutes, clientName, projectName = null) {
     if (!isAdminMode && !isLeadershipMode) return;
     if (endMinutes > 1200) endMinutes = 1200;
     if (endMinutes <= startMinutes) endMinutes = startMinutes + 60;
@@ -4423,17 +5066,7 @@ function createLeadershipTimeEntry(memberIndex, startMinutes, endMinutes, client
     const member = membersToUse[memberIndex];
     if (!member) return;
     
-    // Convert minutes to time strings
-    const startHour = Math.floor(startMinutes / 60);
-    const startMin = startMinutes % 60;
-    const endHour = Math.floor(endMinutes / 60);
-    const endMin = endMinutes % 60;
-    const startTime = `${startHour.toString().padStart(2, '0')}:${startMin.toString().padStart(2, '0')}`;
-    const endTime = `${endHour.toString().padStart(2, '0')}:${endMin.toString().padStart(2, '0')}`;
-    
-    // Create a unique block ID for this time range
     const blockId = `leadership-${startMinutes}-${endMinutes}`;
-    
     const dayDate = getCurrentLeadershipDate();
     const dayName = getDayNameFromDate(dayDate);
     const dayDateKey = formatDateKey(dayDate, dayName);
@@ -4447,10 +5080,9 @@ function createLeadershipTimeEntry(memberIndex, startMinutes, endMinutes, client
     );
     if (!exists) {
         saveStateToHistory();
-        leadershipSchedule[blockKey].push({
-            member: member.name,
-            client: clientName
-        });
+        const assignment = { member: member.name, client: clientName };
+        if (projectName) assignment.project = projectName;
+        leadershipSchedule[blockKey].push(assignment);
         saveData();
         renderSidebar();
         if (isLeadershipMode) {
@@ -4493,10 +5125,9 @@ function moveLeadershipEntry(fromBlockKey, assignmentIndex, toMemberIndex, start
     assignments.splice(assignmentIndex, 1);
     if (assignments.length === 0) delete leadershipSchedule[fromBlockKey];
     if (!leadershipSchedule[newBlockKey]) leadershipSchedule[newBlockKey] = [];
-    leadershipSchedule[newBlockKey].push({
-        member: toMember.name,
-        client: assignment.client
-    });
+    const newAssignment = { member: toMember.name, client: assignment.client };
+    if (assignment.project) newAssignment.project = assignment.project;
+    leadershipSchedule[newBlockKey].push(newAssignment);
     saveData();
     renderSidebar();
     if (isLeadershipMode) {
@@ -4521,10 +5152,9 @@ function duplicateLeadershipEntry(fromBlockKey, assignmentIndex, toMemberIndex, 
     const newBlockKey = `${dayDateKey}-${newBlockId}`;
     saveStateToHistory();
     if (!leadershipSchedule[newBlockKey]) leadershipSchedule[newBlockKey] = [];
-    leadershipSchedule[newBlockKey].push({
-        member: toMember.name,
-        client: assignment.client
-    });
+    const newAssignment = { member: toMember.name, client: assignment.client };
+    if (assignment.project) newAssignment.project = assignment.project;
+    leadershipSchedule[newBlockKey].push(newAssignment);
     saveData();
     renderSidebar();
     if (isLeadershipMode) {

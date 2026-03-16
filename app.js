@@ -1331,6 +1331,17 @@ async function saveSchedule() {
             assignments: isLeadershipBlockKey(blockKey) ? leadershipSchedule[blockKey] : schedule[blockKey]
         }));
 
+        // Safety guard: if there is nothing in memory, do NOT wipe the schedule table in Supabase.
+        // This prevents accidental full data loss when the in-memory schedule is temporarily empty.
+        if (scheduleEntries.length === 0) {
+            console.warn('[saveSchedule] Skipping Supabase write because scheduleEntries is empty.');
+            try {
+                localStorage.setItem('schedule', JSON.stringify(schedule));
+                localStorage.setItem('leadershipSchedule', JSON.stringify(leadershipSchedule));
+            } catch (_) {}
+            return;
+        }
+
         const { data: existing } = await supabase.from('schedule').select('id');
         if (existing && existing.length > 0) {
             const idsToDelete = existing.map(s => s.id);

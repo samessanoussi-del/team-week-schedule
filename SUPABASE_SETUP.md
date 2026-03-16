@@ -106,6 +106,15 @@ CREATE POLICY "Allow all operations on weekly_time_tracking" ON weekly_time_trac
 CREATE INDEX IF NOT EXISTS idx_weekly_time_tracking_week_key ON weekly_time_tracking(week_key);
 ```
 
+### Hourly rates and projects (Ravie alignment)
+
+To enable **hourly rates** per team member and **projects** (with budget) under clients, run **`ADD_HOURLY_RATE_AND_PROJECTS.sql`** in the Supabase SQL Editor. This adds:
+
+- `team_members.hourly_rate` (nullable decimal) for cost calculations
+- `projects` table: `client_name`, `name`, `budget` (and id, timestamps)
+
+Enable Realtime for `projects` if you use multi-user sync.
+
 ## Profile save and "Who is online"
 
 ### Profile save (Save in profile modal)
@@ -158,6 +167,33 @@ To show **other users** who are viewing the app you would need one of these, **o
 2. Open browser console (F12)
 3. Check for any errors
 4. Try making a change and see if it syncs
+
+## Recovering lost schedule data
+
+If your schedule blocks suddenly looked empty (especially for "this week"):
+
+**Why it can happen**
+
+1. The app used to store the *current week* in the browser as a UTC timestamp. In some timezones that made the calendar show a different week (e.g. the previous one) while your real data was stored for the correct week.
+2. When the app saves, it **replaces the entire `schedule` table** with whatever is in memory. So if the app thought it was viewing an empty or wrong week and something triggered a save (e.g. changing theme, other settings), it could overwrite the database with that wrong/empty week and the previous data would be lost.
+
+**How to try to get the data back (Supabase)**
+
+1. Open the [Supabase Dashboard](https://supabase.com/dashboard) and select your project.
+2. Go to **Project Settings** (gear) → **Database**.
+3. Check **Backups** (or **Point in time recovery** on paid plans). If you have a backup from before the data disappeared (e.g. 5 hours ago):
+   - Use **Restore** / **PITR** to restore the project (or the database) to that point in time.  
+   - Or, if Supabase only offers a full backup download, you may need to restore the `schedule` table from that backup (e.g. re-import rows into `schedule`).
+4. After restoring, reload your app; the schedule table will be refilled from the backup.
+
+**localStorage**
+
+- The app also keeps a copy of the schedule in the browser’s localStorage. If the live site had already overwritten that copy with the wrong week, there is no way to recover the previous localStorage state (browsers don’t keep history of it).
+
+**Prevention**
+
+- The app was updated so the current week is stored as a local date (no UTC shift), so the wrong-week view should not recur.
+- For the future, consider exporting a backup of your schedule (e.g. copy the `schedule` table from Supabase or use an export feature if added) so you can re-import if needed.
 
 ## Troubleshooting
 
